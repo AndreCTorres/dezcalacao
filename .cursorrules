@@ -1,0 +1,22 @@
+# Regras do projeto Dezcalação (contexto pro Cursor)
+
+Leia BRIEF.md antes de tudo — é a fonte da verdade do produto.
+
+## Stack
+- Next.js (App Router) + TypeScript. Tailwind pra estilo.
+- Supabase (Postgres + Auth). Schema em supabase/schema.sql.
+- Fonte de dados de futebol: API-Football (lib/apiFootball.ts).
+
+## Regras inegociáveis
+- A chave da API-Football e a service role do Supabase NUNCA vão pro cliente.
+  Toda chamada à API-Football acontece em API routes (servidor).
+- Pontuação = NOTA do jogador no jogo (ver lib/scoring.ts). Bônus são opcionais/aditivos.
+- Time = 16 jogadores (11 titulares + 5 reservas), um por seleção, draft exclusivo no grupo.
+- Posições: GK, ZAG, LAT, MEI, ATK. Substituição respeita a posição.
+- O draft é registrado pelo admin (não é ao vivo). Ver seção 4 do BRIEF.
+
+## Convenções
+- UI e textos em português do Brasil, tom informal e claro.
+- Funções de regra de negócio puras e testáveis (como em lib/scoring.ts).
+- Não usar marcas/logos da FIFA nem imagens de jogadores reais sem cuidado de direito de imagem.
+- Sem qualquer mecânica de aposta — é bolão entre amigos.
