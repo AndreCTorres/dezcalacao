@@ -10,7 +10,7 @@ Para o fluxo stateless funcionar, você **PRECISA** editar o template de e-mail 
 
 ### 1. Acesse seu projeto no Supabase
 ```
-https://app.supabase.com/project/htepcmnsvhidapbchlgl
+https://app.supabase.com
 ```
 
 ### 2. Navegue até Email Templates

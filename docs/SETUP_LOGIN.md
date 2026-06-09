@@ -31,7 +31,7 @@ Sistema de autenticação por magic link (e-mail) implementado com sucesso!
 
 ### 1. Configure as variáveis de ambiente
 
-Certifique-se de que seu arquivo `.env.local` (ou `.env local`) contém:
+Certifique-se de que seu arquivo `.env.local` contém:
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=sua_url_aqui

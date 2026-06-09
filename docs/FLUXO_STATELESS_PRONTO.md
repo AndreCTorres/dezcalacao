@@ -10,8 +10,8 @@ Implementado o **Plano B**: fluxo stateless com `token_hash` + `verifyOtp` que *
 
 ### ✅ Criados:
 1. **`app/auth/confirm/route.ts`** - Nova rota stateless que usa `verifyOtp()`
-2. **`CONFIGURAR_EMAIL_TEMPLATE.md`** - Guia completo de configuração do Supabase
-3. **`FLUXO_STATELESS_PRONTO.md`** - Este arquivo
+2. **`docs/CONFIGURAR_EMAIL_TEMPLATE.md`** - Guia completo de configuração do Supabase
+3. **`docs/FLUXO_STATELESS_PRONTO.md`** - Este arquivo
 
 ### ✅ Modificados:
 1. **`app/login/page.tsx`** - Adicionado tratamento de erros (`confirm_failed`, `auth_failed`)
@@ -28,7 +28,7 @@ Você **PRECISA** editar o template de e-mail no Supabase Dashboard:
 
 ### 📍 Onde:
 ```
-https://app.supabase.com/project/htepcmnsvhidapbchlgl
+https://app.supabase.com
 → Authentication
 → Email Templates
 → Magic Link
@@ -81,7 +81,6 @@ http://localhost:3000/login
 Você deve ver:
 ```
 [Login] Enviando magic link para: seu@email.com
-[Login] URL de callback configurada: http://localhost:3000/auth/callback
 [Login] ✓ Magic link enviado com sucesso
 ```
 
@@ -100,11 +99,7 @@ http://localhost:3000/auth/confirm?token_hash=abc123xyz&type=email
 Você deve ver:
 ```
 [Confirm] Recebendo confirmação de magic link (stateless)
-[Confirm] Token hash presente: true
-[Confirm] Type: email
-[Confirm] Verificando OTP com token_hash...
 [Confirm] ✓ Sessão criada com sucesso (stateless)
-[Confirm] Usuário: seu@email.com
 [Confirm] Redirecionando para: /admin
 ```
 
@@ -114,7 +109,7 @@ Você deve ver:
 
 ## 🎨 Template de e-mail completo (Opcional)
 
-Se quiser usar o template customizado em português com design verde-limão, copie o HTML completo de `CONFIGURAR_EMAIL_TEMPLATE.md` e cole no Supabase.
+Se quiser usar o template customizado em português com design verde-limão, copie o HTML completo de `docs/CONFIGURAR_EMAIL_TEMPLATE.md` e cole no Supabase.
 
 O template inclui:
 - ✅ Design em português
@@ -164,9 +159,8 @@ O template inclui:
 
 ## 📚 Documentação de referência
 
-- Ver detalhes: `CONFIGURAR_EMAIL_TEMPLATE.md`
-- Guia PKCE (antigo): `FIX_PKCE.md`
-- Setup geral: `SETUP_LOGIN.md`
+- Ver detalhes: `docs/CONFIGURAR_EMAIL_TEMPLATE.md`
+- Setup geral: `docs/SETUP_LOGIN.md`
 
 ---
 

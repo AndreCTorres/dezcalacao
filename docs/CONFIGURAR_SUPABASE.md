@@ -9,7 +9,7 @@ Para o magic link funcionar corretamente, você **PRECISA** adicionar a URL de c
 ## 📝 Como configurar:
 
 ### 1. Acesse seu projeto no Supabase
-Vá para: https://app.supabase.com/project/htepcmnsvhidapbchlgl
+Vá para: https://app.supabase.com
 
 ### 2. Navegue até Authentication
 No menu lateral esquerdo, clique em:
