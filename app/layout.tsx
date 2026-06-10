@@ -1,4 +1,5 @@
 import './globals.css'
+import { ToastContainer } from '@/app/components/toast'
 
 export const metadata = {
   title: 'Dezcalação',
@@ -12,7 +13,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-BR">
-      <body>{children}</body>
+      <body>
+        {children}
+        <ToastContainer />
+      </body>
     </html>
   )
 }
