@@ -54,7 +54,7 @@ export async function calculateMemberRoundScore(
   const playerIds = teamPlayers.map((tp) => tp.player_id)
   const { data: allRatings } = await admin
     .from('player_round_ratings')
-    .select('player_id, rating, minutes')
+    .select('id, player_id, round_id, fixture_id, rating, minutes, source, fetched_at')
     .eq('round_id', roundId)
     .in('player_id', playerIds)
 
@@ -62,7 +62,7 @@ export async function calculateMemberRoundScore(
 
   // Criar map de ratings para lookup rápido
   const ratingsMap = new Map<number, PlayerRoundRating>()
-  allRatings.forEach((r) => ratingsMap.set(r.player_id as number, r))
+  allRatings.forEach((r) => ratingsMap.set(r.player_id as number, r as PlayerRoundRating))
 
   // Criar map de ratings por posição (para bônus)
   const ratingsByPosition = new Map<string, PlayerRoundRating[]>()
@@ -72,7 +72,7 @@ export async function calculateMemberRoundScore(
       if (!ratingsByPosition.has(tp.position_slot)) {
         ratingsByPosition.set(tp.position_slot, [])
       }
-      ratingsByPosition.get(tp.position_slot)!.push(r)
+      ratingsByPosition.get(tp.position_slot)!.push(r as PlayerRoundRating)
     }
   })
 
@@ -86,9 +86,31 @@ export async function calculateMemberRoundScore(
     pointsCraquePartida: 1.0,
   }
 
+  // Converter PlayerRoundRating para PlayerRating (tipo esperado por basePoints)
+  const playerRatingsMap = new Map<number, any>()
+  ratingsMap.forEach((roundRating, playerId) => {
+    const teamPlayer = teamPlayers.find(tp => tp.player_id === playerId)
+    if (teamPlayer) {
+      playerRatingsMap.set(playerId, {
+        playerId: playerId,
+        teamId: 0, // não usado no cálculo
+        position: teamPlayer.position_slot,
+        rating: roundRating.rating,
+        minutes: roundRating.minutes,
+      })
+    }
+  })
+
+  // Converter TeamPlayer para LineupSlot
+  const lineupSlots = effectiveLineup.map((tp) => ({
+    playerId: tp.player_id,
+    position: tp.position_slot,
+    slot: tp.slot,
+  }))
+
   const basePts = basePoints(
-    effectiveLineup,
-    ratingsMap,
+    lineupSlots,
+    playerRatingsMap,
     pureScoringConfig
   )
 
@@ -226,9 +248,9 @@ export async function getGroupStandings(groupId: string, roundId?: string) {
 
   // Agrupar e somar se não for round específico
   const standings = scores
-    .map((score) => ({
+    .map((score: any) => ({
       memberId: score.group_member_id,
-      memberName: score.group_members?.display_name || 'Desconhecido',
+      memberName: score.group_members?.[0]?.display_name || score.group_members?.display_name || 'Desconhecido',
       points: score.total_points,
     }))
     .sort((a, b) => b.points - a.points)

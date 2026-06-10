@@ -25,7 +25,7 @@ export function SyncPlayersButton() {
       const res = await syncPlayers()
       setResult(res)
       
-      if (res.success) {
+      if (res.success && 'teamsResolved' in res && 'playersInserted' in res && 'teamsPending' in res) {
         alert(
           `✓ Sincronização concluída!\n\n` +
           `Seleções resolvidas: ${res.teamsResolved} / 48\n` +
@@ -35,7 +35,7 @@ export function SyncPlayersButton() {
             : '')
         )
       } else {
-        alert(`✗ Erro: ${res.error}`)
+        alert(`✗ Erro: ${res.error || 'Erro desconhecido'}`)
       }
     } catch (error: any) {
       alert(`✗ Erro: ${error.message}`)

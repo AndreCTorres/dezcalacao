@@ -333,7 +333,7 @@ export async function syncPlayers() {
 
     // Salvar IDs no cache (tabela teams)
     console.log('[Sync] Salvando cache de times...')
-    for (const [country, { id, apiName }] of teamIdMap.entries()) {
+    for (const [country, { id, apiName }] of Array.from(teamIdMap.entries())) {
       await admin
         .from('teams')
         .upsert({
@@ -354,7 +354,7 @@ export async function syncPlayers() {
 
     let totalPlayersInserted = 0
 
-    for (const [country, { id: teamId, apiName: teamName }] of teamIdMap.entries()) {
+    for (const [country, { id: teamId, apiName: teamName }] of Array.from(teamIdMap.entries())) {
       console.log(`[Sync] Sincronizando ${country} (${teamName}, ID: ${teamId})...`)
 
       try {
