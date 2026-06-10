@@ -224,36 +224,68 @@ function applySubstitutions(
 export async function getGroupStandings(groupId: string, roundId?: string) {
   const admin = supabaseAdmin()
 
-  let query = admin
-    .from('round_scores')
-    .select(
+  try {
+    // Buscar todas as rodadas do grupo para validação
+    const { data: rounds } = await admin
+      .from('rounds')
+      .select('id, group_id')
+      .eq('group_id', groupId)
+
+    if (!rounds || rounds.length === 0) return []
+
+    const roundIds = rounds.map((r) => r.id)
+
+    // Buscar scores apenas das rodadas deste grupo
+    let query = admin
+      .from('round_scores')
+      .select(
+        `
+        group_member_id,
+        total_points,
+        round_id,
+        group_members (
+          display_name
+        )
       `
-      group_member_id,
-      total_points,
-      group_members (
-        display_name
       )
-    `
-    )
+      .in('round_id', roundIds)
 
-  // Se roundId não fornecido, pegar pontuação acumulada (group by member, sum)
-  if (roundId) {
-    query = query.eq('round_id', roundId)
+    if (roundId) {
+      query = query.eq('round_id', roundId)
+    }
+
+    const { data: scores } = await query
+
+    if (!scores || scores.length === 0) return []
+
+    // Agrupar por membro e somar pontos
+    const memberScores = new Map<string, { name: string; total: number }>()
+
+    scores.forEach((score: any) => {
+      const memberId = score.group_member_id
+      const name = score.group_members?.display_name || 'Desconhecido'
+      const points = score.total_points || 0
+
+      if (!memberScores.has(memberId)) {
+        memberScores.set(memberId, { name, total: 0 })
+      }
+
+      const current = memberScores.get(memberId)!
+      current.total += points
+    })
+
+    // Converter para array e ordenar
+    const standings = Array.from(memberScores.entries())
+      .map(([memberId, data]) => ({
+        memberId,
+        memberName: data.name,
+        points: Math.round(data.total * 100) / 100,
+      }))
+      .sort((a, b) => b.points - a.points)
+
+    return standings
+  } catch (error) {
+    console.error('[Standings] Erro ao buscar:', error)
+    return []
   }
-
-  // Filtrar por grupo
-  const { data: scores } = await query
-
-  if (!scores) return []
-
-  // Agrupar e somar se não for round específico
-  const standings = scores
-    .map((score: any) => ({
-      memberId: score.group_member_id,
-      memberName: score.group_members?.[0]?.display_name || score.group_members?.display_name || 'Desconhecido',
-      points: score.total_points,
-    }))
-    .sort((a, b) => b.points - a.points)
-
-  return standings
 }
