@@ -91,52 +91,83 @@ dezcalacao/
 │
 ├── app/                              # Next.js App Router
 │   ├── api/
-│   │   └── internal/                 # ✨ Rotas internas
-│   │       ├── sync/
-│   │       └── scoring/
+│   │   ├── rounds/
+│   │   │   └── [groupId]/
+│   │   │       └── details/
+│   │   │           └── route.ts      # ✨ API para detalhes de rodadas
+│   │   └── [outras rotas]
 │   ├── components/
 │   │   ├── ui/                       # ✨ Componentes genéricos
 │   │   │   ├── Button.tsx
 │   │   │   ├── Card.tsx
 │   │   │   ├── Input.tsx
 │   │   │   └── index.ts
-│   │   └── [componentes específicos]
+│   │   └── logout-button.tsx
 │   ├── admin/
-│   ├── app/
+│   │   ├── rodadas/
+│   │   │   ├── actions.ts            # closeRound() com scoring
+│   │   │   └── page.tsx
+│   │   └── [outras páginas]
+│   ├── app/                          # Dashboard do participante
+│   │   ├── page.tsx                  # Home com ranking + time + rodadas
+│   │   ├── time/
+│   │   │   └── page.tsx              # ✨ Gerenciar substituições
+│   │   ├── participant-team.tsx      # ✨ Time com botão de subs
+│   │   ├── participant-standings.tsx # ✨ Ranking ao vivo (30s)
+│   │   ├── round-details.tsx         # ✨ Acordeon de rodadas
+│   │   ├── substitutions-actions.ts  # ✨ Server Actions de subs
+│   │   ├── substitution-interface.tsx # ✨ UI interativa de subs
+│   │   └── standings-actions.ts      # ✨ Server Actions de ranking
 │   ├── login/
 │   ├── auth/
 │   ├── layout.tsx
 │   └── globals.css
 │
 ├── lib/                              # Código reutilizável
-│   ├── services/                     # ✨ Services de negócio
+│   ├── services/
 │   │   ├── group.service.ts          # Lógica de grupos
-│   │   ├── scoring.service.ts        # Orquestração de pontuação
+│   │   ├── scoring.service.ts        # ✨ Orquestração + standings
+│   │   │   ├── calculateMemberRoundScore()
+│   │   │   ├── calculateRoundScores()
+│   │   │   └── getGroupStandings() [FIXED: filtra por grupo]
 │   │   ├── sync.service.ts           # Sincronização de dados
 │   │   └── index.ts
 │   ├── types.ts                      # ✨ Tipos compartilhados
+│   │   ├── Substitution
+│   │   ├── RoundScore
+│   │   ├── PlayerRoundRating
+│   │   └── [tipos do domínio]
 │   ├── supabase.ts
 │   ├── supabase-server.ts
 │   ├── apiFootball.ts
-│   └── scoring.ts                    # Lógica pura de pontuação
+│   └── scoring.ts                    # ✨ Lógica pura de pontuação
+│       ├── effectiveRating()
+│       ├── basePoints()
+│       ├── selecaoDaRodada()
+│       └── craquesDaRodada()
 │
 ├── supabase/                         # Banco de dados
-│   ├── migrations/                   # ✨ Migrations organizadas
+│   ├── migrations/                   # Migrations versionadas
 │   │   ├── 001_initial_schema.sql
 │   │   ├── 002_teams_sync.sql
 │   │   └── 003_rls_policies.sql
-│   ├── schema.sql                    # (legado - ver migrations/001)
-│   ├── rls-policies.sql              # (legado - ver migrations/003)
-│   └── migration-teams-sync.sql      # (legado - ver migrations/002)
+│   └── [schema files]
 │
 └── [config files]                    # tsconfig, package.json, etc.
 ```
 
-**Novidades:**
-- ✨ `lib/types.ts` — Tipos compartilhados (centralizados)
-- ✨ `lib/services/` — Services de negócio (grupo, scoring, sync)
-- ✨ `app/components/ui/` — Componentes genéricos reutilizáveis
-- ✨ `supabase/migrations/` — Migrations versionadas
+**✨ Novidades (Junho 2026 - Pontuação, Subs, Ranking):**
+- ✨ `app/app/substitution-interface.tsx` — UI interativa (GK/ZAG/LAT/MEI/ATK)
+- ✨ `app/app/substitutions-actions.ts` — Server Actions com 8 validações
+- ✨ `app/app/time/page.tsx` — Página de escalação + substituições
+- ✨ `app/app/standings-actions.ts` — Busca standings com grupo filtrado
+- ✨ `app/app/participant-standings.tsx` — Ranking ao vivo (atualiza 30s, medalhas top 3)
+- ✨ `app/app/round-details.tsx` — Acordeon de pontuação por rodada
+- ✨ `app/api/rounds/[groupId]/details/route.ts` — API de detalhes de rodadas
+- ✨ `app/app/participant-team.tsx` — Adicionado botão "🔄 Substituições"
+- ✨ `lib/scoring.ts` — Lógica pura + tipos definidos
+- ✨ `lib/services/scoring.service.ts` — Orquestração + bug fix em `getGroupStandings()`
+- ✨ `app/admin/rodadas/actions.ts` — `closeRound()` integrado com scoring completo
 
 ---
 
@@ -162,6 +193,44 @@ dezcalacao/
 3. Resolve IDs de 48 seleções (API-Football)
 4. Sincroniza elencos (upsert em `players`)
 5. Retorna resultado (sucesso/pendências)
+
+### Fechar Rodada & Calcular Pontuação
+1. Admin em `/admin/rodadas` clica "Fechar Rodada"
+2. `closeRound()` orquestra:
+   - Busca fixtures da Copa 2026 (API-Football)
+   - Para cada fixture: fetch player stats + upsert em `player_round_ratings`
+   - Chama `calculateRoundScores(groupId, roundId)`
+   - Cada membro: `calculateMemberRoundScore()` → busca draft + subs + ratings
+   - `applySubstitutions()` → lineup efetivo (subs contam como titulares)
+   - `basePoints()` → soma notas dos 11 titulares (com validação de minutos)
+   - Upsert em `round_scores`
+   - Muda `round.status = 'scored'`
+3. Retorna feedback com stats (ratings inseridos, membros calculados)
+
+### Fazer Substituição (Antes da Rodada Ser Fechada)
+1. Participante em `/app/time` clica um titular
+2. Seleciona uma reserva (mesma posição)
+3. `applySubstitution()` valida:
+   - Membro autenticado (user.id == member.profile_id)
+   - Rodada aberta (status = 'open')
+   - Titular sai (slot = 'starter'), reserva entra (slot = 'bench')
+   - Mesma posição (position_slot)
+   - Limite respeitado (< max_subs_por_rodada)
+4. Insere em `substitutions` table
+5. Quando `calculateMemberRoundScore()` roda, aplica substituições automaticamente
+
+### Ver Ranking & Pontuação
+1. Participante em `/app` vê:
+   - **Card "Seu Time"**: titulares + reservas (com botão "🔄 Substituições")
+   - **Card "🏆 Ranking"**: standings com:
+     - 🥇🥈🥉 para top 3
+     - Total geral (acumulado)
+     - Último score (+X)
+     - Atualiza a cada 30s via `getGroupStandingsWithRounds()`
+   - **Seção "📊 Pontuação por Rodada"**: acordeon expandível
+     - Clica rodada → vê scores de cada membro naquela rodada
+     - Via `/api/rounds/[groupId]/details`
+2. Dados vêm de `round_scores` summed por membro + rodada
 
 ---
 
@@ -215,13 +284,175 @@ Antes de fazer commit/PR, verifique:
 
 ---
 
-## 📚 Referências Rápidas
+## 📋 Status de Implementação (Junho 2026)
+
+### ✅ Priority 1: Integrar Pontuação ao Fluxo
+- ✅ `closeRound()` em `app/admin/rodadas/actions.ts`
+- ✅ Sincronização de ratings (API-Football → `player_round_ratings`)
+- ✅ Cálculo automático de pontuação (`calculateRoundScores()`)
+- ✅ Atualização de status de rodada para `'scored'`
+- ✅ Build sem erros, testes manuais passando
+
+### ✅ Priority 2: UI de Substituições
+- ✅ Server Actions com 8 validações (`substitutions-actions.ts`)
+- ✅ Interface interativa por posição (`substitution-interface.tsx`)
+- ✅ Página completa `/app/time`
+- ✅ Botão "🔄 Substituições" na home
+- ✅ Reversão de substituições
+- ✅ Indicador de limite (N / max_subs)
+
+### ✅ Priority 3: Ranking em Tempo Real
+- ✅ Componente com auto-atualização 30s (`participant-standings.tsx`)
+- ✅ Medalhas para top 3 (🥇🥈🥉)
+- ✅ Exibição de último score
+- ✅ Acordeon de rodadas com detalhes (`round-details.tsx`)
+- ✅ API route `/api/rounds/[groupId]/details`
+- ✅ Bug fix em `getGroupStandings()` para filtrar por grupo
+
+### 🎯 Priority 4: Testes + Polimento (Atual - IMPLEMENTANDO)
+- ✅ Testes E2E com Playwright (3 suites)
+- ✅ Testes unitários de scoring
+- ✅ Error handling melhorado (try/catch + toasts)
+- ✅ Loading states visuais
+- ✅ Toast notifications (sucesso/erro)
+- ✅ Documentação de testes (`docs/TESTING.md`)
+- ⏳ Scripts de teste em package.json
+- ⏳ Data seeding para testes
+
+---
+
+## 🧪 Testes (Priority 4)
+
+### E2E com Playwright
+
+**Suites:**
+- `tests/e2e/scoring.spec.ts` — Fluxo: admin fecha → scores aparecem
+- `tests/e2e/substitutions.spec.ts` — Fluxo: participante faz sub → reverter
+- `tests/e2e/ranking.spec.ts` — Fluxo: ranking ao vivo + acordeom
+
+**Commands:**
+```bash
+npm test              # Todos os testes
+npm run test:e2e      # Apenas E2E
+npm run test:ui       # UI interativa
+npm run test:debug    # Debug passo a passo
+```
+
+### Unit Tests
+
+**Suite:**
+- `tests/unit/scoring.test.ts` — Funções puras:
+  - `effectiveRating()` — Nota com validações
+  - `basePoints()` — Soma dos 11 titulares
+  - `selecaoDaRodada()` — XI da rodada
+
+**Command:**
+```bash
+npm run test:unit
+```
+
+### Error Handling
+
+**Implementado:**
+- Try/catch em Server Actions
+- Toast notifications (sucesso/erro/warning/info)
+- `app/components/toast.tsx` — Sistema de notificações
+- Messages de feedback em componentes
+- Logs estruturados ([Rounds], [Scoring], [Substitution])
+
+**Usar toasts:**
+```typescript
+if (typeof window !== 'undefined' && (window as any).showToast) {
+  (window as any).showToast('Mensagem', 'success', 3000)
+}
+// ou: 'error', 'warning', 'info'
+```
+
+### Referências
+
+- `docs/TESTING.md` — Guia completo de testes
+- `playwright.config.ts` — Configuração Playwright
+- `tests/` — Suites de teste
+
+---
 
 - **Schema:** `supabase/schema.sql`
-- **Scoring:** `lib/scoring.ts`
+- **Scoring:** `lib/scoring.ts` (lógica pura) + `lib/services/scoring.service.ts` (orquestração)
 - **API-Football:** `lib/apiFootball.ts`
+- **Substituições:** `app/app/substitutions-actions.ts` (server) + `app/app/substitution-interface.tsx` (UI)
+- **Ranking:** `app/app/standings-actions.ts` (server) + `app/app/participant-standings.tsx` (UI)
 - **Docs:** `docs/` (começar com `BRIEF.md`)
 - **Convenções:** Este arquivo
+
+---
+
+## 🔌 Fluxos de Dados (Referência Técnica)
+
+### Cálculo de Pontuação (Quando rodada é fechada)
+```
+closeRound(groupId, roundId)
+  → getFixtures() [API-Football]
+  → Para cada fixture:
+      → getPlayerStats(fixtureId) [API-Football]
+      → Upsert em player_round_ratings
+  → calculateRoundScores(groupId, roundId)
+      → Para cada membro do grupo:
+          → Busca team_players (draft)
+          → Busca substitutions dessa rodada
+          → applySubstitutions() → lineup efetivo
+          → Busca player_round_ratings
+          → basePoints(lineup, ratings) → soma dos 11 titulares
+          → Upsert em round_scores
+  → round.status = 'scored'
+```
+
+### Exibição de Ranking
+```
+/app (home)
+  → ParticipantStandings (client component, useEffect)
+      → getGroupStandingsWithRounds(groupId)
+          → Busca todas as rodadas do grupo
+          → Para cada membro: sum(round_scores.total_points)
+          → Retorna standings ordenado + last_round
+      → Renderiza com medalhas top 3
+      → Atualiza a cada 30s
+
+  → RoundDetails (client component, useEffect)
+      → /api/rounds/[groupId]/details
+          → Para cada rodada: busca scores + nomes
+          → Retorna array de rodadas com scores
+      → Renderiza acordeon expandível
+```
+
+### Aplicação de Substituição (Antes da rodada fechar)
+```
+/app/time (página de subs)
+  → SubstitutionInterface (client, trata cliques)
+      → applySubstitution(outPlayerId, inPlayerId)
+          ✅ Valida membro autenticado
+          ✅ Valida rodada aberta
+          ✅ Valida titular → reserva
+          ✅ Valida mesma posição
+          ✅ Valida limite
+          → Insere em substitutions
+          → Revalidate /app/time
+      → removeSubstitution(subId)
+          ✅ Valida ownership
+          → Delete de substitutions
+          → Revalidate /app/time
+```
+
+### Retenção de Substituições
+```
+Quando calculateMemberRoundScore() é chamado:
+  1. Busca team_players (16 do draft)
+  2. Busca substitutions da rodada
+  3. applySubstitutions() modifica lineup:
+     - Se jogador foi out_player_id, substitui por in_player_id
+     - Substituto conta como "starter" para cálculo
+  4. basePoints() soma 11 titulares (incluindo substitutos)
+  5. Reservas que entraram recebem rating do jogo que jogaram
+```
 
 ---
 
@@ -247,7 +478,44 @@ Antes de fazer commit/PR, verifique:
 - Execute `supabase/migration-teams-sync.sql` primeiro
 - Use botão em `/admin` (admin-only)
 
+### "Como funciona o cálculo de pontuação?"
+- **Base**: Soma das notas dos 11 titulares (minutos >= 20, nota >= 0)
+- **Nota faltando**: Usa `neutralRating` (6.0) até a nota chegar, depois recalcula
+- **Substituição**: Reserva que entrou conta como titular (recebe nota do jogo)
+- **Bônus**: XI da rodada + craque (desativado na fase 1, fase 2 tem)
+- **Limite**: Máximo de N substituições por rodada (configurável por grupo)
+
+### "Quando as substituições são aplicadas?"
+- **Entrada**: Participante faz em `/app/time` enquanto rodada está `open`
+- **Validação**: Check de posição, limite, status
+- **Aplicação**: Quando `calculateMemberRoundScore()` roda (admin fecha rodada)
+- **Permanência**: Só valem para aquela rodada, reset em rodada nova
+
+### "O ranking é ao vivo?"
+- Sim, `/app` atualiza a cada 30s via `useEffect`
+- Busca via `getGroupStandingsWithRounds()`
+- Soma acumulada de todas as rodadas fechadas
+
+### "Posso ver apenas uma rodada?"
+- API route `/api/rounds/[groupId]/details` traz todas as rodadas
+- Frontend com acordeon expandível (clique para ver scores)
+- Scores ordenados por total_points DESC
+
+### "Como rodar testes?"
+- E2E: `npm run test:e2e` (precisa dev server rodando)
+- Unit: `npm run test:unit`
+- UI interativa: `npm run test:ui`
+- Debug: `npm run test:debug`
+- Veja `docs/TESTING.md` para detalhes
+
+### "Meu teste E2E está falhando"
+1. Cheque se dev server está rodando (`npm run dev`)
+2. Verifique DB de teste tem dados (grupo, participantes, rodada)
+3. Use `npm run test:debug` para pausar e ver
+4. Verifique seletores (data-testid, text=, etc)
+5. Aumente timeout se necessário: `timeout: 30000`
+
 ---
 
 **Última atualização:** Junho 2026  
-**Versão:** 1.0
+**Versão:** 3.0 (com Testes + Polimento)
