@@ -55,6 +55,14 @@ export type GroupWithMembers = Group & {
 
 export type Position = 'GK' | 'ZAG' | 'LAT' | 'MEI' | 'ATK'
 
+export const POSITION_LABELS: Record<Position, string> = {
+  GK: 'Goleiro',
+  ZAG: 'Zagueiro',
+  LAT: 'Lateral',
+  MEI: 'Meio-campo',
+  ATK: 'Ataque',
+}
+
 export type Player = {
   api_player_id: number // Primary key da API
   name: string

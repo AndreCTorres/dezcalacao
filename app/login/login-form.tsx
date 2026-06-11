@@ -1,78 +1,138 @@
 'use client'
 
-// app/login/login-form.tsx
-// Formulário de login (Client Component para interatividade).
-
 import { useState } from 'react'
-import { signInWithEmail } from './actions'
+import { useRouter } from 'next/navigation'
+import { signInWithPassword, signInWithEmail } from './actions'
 
 export function LoginForm() {
-  const [email, setEmail] = useState('')
+  const router = useRouter()
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [error, setError] = useState('')
+
+  // Converte o "nome de usuário" (ex: "lucas") para o e-mail interno
+  function resolveEmail(input: string): string {
+    const val = input.trim().toLowerCase()
+    // Se já tem @, usa como está
+    if (val.includes('@')) return val
+    // Caso contrário, assume domínio interno
+    return `${val}@dezcalacao.local`
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    
-    if (!email || !email.includes('@')) {
-      setMessage({ type: 'error', text: 'Por favor, insira um e-mail válido' })
+    if (!username || !password) {
+      setError('Preencha usuário e senha.')
       return
     }
 
     setLoading(true)
-    setMessage(null)
+    setError('')
 
-    const result = await signInWithEmail(email)
-
-    setLoading(false)
+    const email = resolveEmail(username)
+    const result = await signInWithPassword(email, password)
 
     if (result.error) {
-      setMessage({ type: 'error', text: result.error })
-    } else {
-      setMessage({ 
-        type: 'success', 
-        text: 'Link enviado! Verifique seu e-mail para continuar.' 
-      })
-      setEmail('')
+      setError(result.error)
+      setLoading(false)
+      return
     }
+
+    // Sucesso — redireciona para /app (participante) ou /admin (admin)
+    router.push('/admin')
+    router.refresh()
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-5">
+      {/* Usuário */}
       <div>
-        <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
-          E-mail
+        <label
+          htmlFor="username"
+          className="block text-sm font-semibold mb-2"
+          style={{ color: '#8b9690', fontFamily: 'Space Mono, monospace', letterSpacing: '1px', textTransform: 'uppercase', fontSize: '11px' }}
+        >
+          Usuário
         </label>
         <input
-          id="email"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="seu@email.com"
+          id="username"
+          type="text"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
           disabled={loading}
-          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition"
-          required
+          autoComplete="username"
+          className="w-full px-4 py-3 rounded-xl text-white outline-none transition disabled:opacity-50"
+          style={{
+            background: 'rgba(255,255,255,.05)',
+            border: '1px solid rgba(197,242,74,.15)',
+            fontFamily: 'Hanken Grotesk, sans-serif',
+            fontSize: '16px',
+          }}
+          onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(197,242,74,.5)' }}
+          onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(197,242,74,.15)' }}
         />
       </div>
 
-      {message && (
-        <div
-          className={`p-4 rounded-lg text-sm ${
-            message.type === 'success'
-              ? 'bg-lime-400/10 text-lime-400 border border-lime-400/20'
-              : 'bg-red-500/10 text-red-400 border border-red-400/20'
-          }`}
+      {/* Senha */}
+      <div>
+        <label
+          htmlFor="password"
+          className="block text-sm font-semibold mb-2"
+          style={{ color: '#8b9690', fontFamily: 'Space Mono, monospace', letterSpacing: '1px', textTransform: 'uppercase', fontSize: '11px' }}
         >
-          {message.text}
+          Senha
+        </label>
+        <input
+          id="password"
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          disabled={loading}
+          autoComplete="current-password"
+          className="w-full px-4 py-3 rounded-xl text-white outline-none transition disabled:opacity-50"
+          style={{
+            background: 'rgba(255,255,255,.05)',
+            border: '1px solid rgba(197,242,74,.15)',
+            fontFamily: 'Hanken Grotesk, sans-serif',
+            fontSize: '16px',
+          }}
+          onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(197,242,74,.5)' }}
+          onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(197,242,74,.15)' }}
+        />
+      </div>
+
+      {/* Erro */}
+      {error && (
+        <div
+          className="p-3 rounded-xl text-sm flex items-center gap-2"
+          style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', color: '#f87171' }}
+        >
+          <span>⚠️</span> {error}
         </div>
       )}
 
+      {/* Botão */}
       <button
         type="submit"
         disabled={loading}
-        className="w-full py-3 px-4 bg-lime-400 hover:bg-lime-500 text-gray-900 font-semibold rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-lime-400"
+        className="w-full py-3 px-4 rounded-xl font-bold text-base transition disabled:opacity-50"
+        style={{
+          background: loading ? '#9bc23a' : '#c5f24a',
+          color: '#0a0e0c',
+          fontFamily: 'Hanken Grotesk, sans-serif',
+          fontSize: '16px',
+          cursor: loading ? 'not-allowed' : 'pointer',
+        }}
       >
-        {loading ? 'Enviando...' : 'Enviar link mágico'}
+        {loading ? (
+          <span className="flex items-center justify-center gap-2">
+            <span className="w-4 h-4 border-2 border-gray-900 border-t-transparent rounded-full animate-spin inline-block" />
+            Entrando...
+          </span>
+        ) : (
+          'Entrar →'
+        )}
       </button>
     </form>
   )

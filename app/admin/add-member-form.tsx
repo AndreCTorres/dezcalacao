@@ -6,6 +6,12 @@
 import { useState } from 'react'
 import { addMember } from './actions'
 
+function showToast(message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') {
+  if (typeof window !== 'undefined' && (window as any).showToast) {
+    (window as any).showToast(message, type, 3000)
+  }
+}
+
 type AddMemberFormProps = {
   groupId: string
 }
@@ -35,8 +41,12 @@ export function AddMemberForm({ groupId }: AddMemberFormProps) {
 
     if (result.error) {
       setError(result.error)
+      showToast(result.error, 'error')
     } else {
       setSuccess(true)
+      if (result.message) {
+        showToast(result.message, 'success')
+      }
       // Limpar formulário usando a referência capturada
       form.reset()
       // Limpar mensagem de sucesso após 3 segundos

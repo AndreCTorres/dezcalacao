@@ -11,15 +11,22 @@ export async function createGroup(formData: FormData) {
   const name = formData.get('name') as string
 
   if (!name || name.trim().length === 0) {
-    return { error: 'Nome do grupo é obrigatório' }
+    return { error: 'Nome do grupo é obrigatório', success: false }
   }
 
   // Cliente para autenticação (getUser funciona)
   const supabase = createActionClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   
+  console.log('[createGroup] User:', { id: user?.id, email: user?.email })
+  
   if (authError || !user) {
-    return { error: 'Você precisa estar logado para criar um grupo' }
+    return { error: 'Você precisa estar logado para criar um grupo', success: false }
+  }
+
+  if (!user.id) {
+    console.error('[createGroup] User ID inválido:', user)
+    return { error: 'Erro: user.id não disponível', success: false }
   }
 
   // Derivar display_name do usuário
@@ -29,6 +36,25 @@ export async function createGroup(formData: FormData) {
 
   // Service role para escrita - user.id já validado
   const admin = supabaseAdmin()
+
+  // GARANTIR que o profile existe (pode ter falhado o trigger)
+  console.log('[createGroup] Garantindo que profile existe...')
+  const { error: profileError } = await admin
+    .from('profiles')
+    .upsert(
+      {
+        id: user.id,
+        display_name: displayName,
+      },
+      { onConflict: 'id' }
+    )
+
+  if (profileError) {
+    console.error('[createGroup] Erro ao garantir profile:', profileError)
+    return { error: `Erro ao criar perfil: ${profileError.message}`, success: false }
+  }
+
+  console.log('[createGroup] ✓ Profile garantido')
 
   // Criar o grupo
   const { data: group, error: groupError } = await admin
@@ -42,9 +68,16 @@ export async function createGroup(formData: FormData) {
     .single()
 
   if (groupError || !group) {
-    console.error('[createGroup] Erro ao criar grupo:', groupError)
-    return { error: 'Erro ao criar grupo. Tente novamente.' }
+    console.error('[createGroup] Erro ao criar grupo:', {
+      error: groupError,
+      message: groupError?.message,
+      code: groupError?.code,
+      details: groupError?.details,
+    })
+    return { error: `Erro ao criar grupo: ${groupError?.message || 'Erro desconhecido'}`, success: false }
   }
+
+  console.log('[createGroup] ✓ Grupo criado:', group.id)
 
   // Adicionar o próprio admin como membro do grupo
   const { data: member, error: memberError } = await admin
@@ -61,16 +94,23 @@ export async function createGroup(formData: FormData) {
     .single()
 
   if (memberError || !member) {
-    console.error('[createGroup] Erro ao adicionar membro:', memberError)
+    console.error('[createGroup] Erro ao adicionar membro:', {
+      error: memberError,
+      message: memberError?.message,
+      code: memberError?.code,
+      details: memberError?.details,
+    })
     // Reverter criação do grupo
     await admin.from('groups').delete().eq('id', group.id)
-    return { error: 'Erro ao configurar grupo. Tente novamente.' }
+    return { error: `Erro ao configurar grupo: ${memberError?.message || 'Erro desconhecido'}`, success: false }
   }
+
+  console.log('[createGroup] ✓ Membro adicionado')
 
   // Revalidar a página para mostrar o novo grupo
   revalidatePath('/admin')
 
-  return { success: true, groupId: group.id }
+  return { success: true, groupId: group.id, message: `✅ Grupo "${name}" criado com sucesso!` }
 }
 
 export async function addMember(formData: FormData) {
@@ -80,14 +120,14 @@ export async function addMember(formData: FormData) {
 
   // Validações básicas
   if (!groupId || !displayName || displayName.trim().length === 0) {
-    return { error: 'Nome do membro é obrigatório' }
+    return { error: 'Nome do membro é obrigatório', success: false }
   }
 
   // Validar e-mail (se fornecido)
   if (inviteEmail && inviteEmail.trim().length > 0) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(inviteEmail.trim())) {
-      return { error: 'E-mail inválido' }
+      return { error: 'E-mail inválido', success: false }
     }
   }
 
@@ -96,7 +136,7 @@ export async function addMember(formData: FormData) {
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   
   if (authError || !user) {
-    return { error: 'Você precisa estar logado' }
+    return { error: 'Você precisa estar logado', success: false }
   }
 
   // Service role para verificação e escrita
@@ -112,7 +152,7 @@ export async function addMember(formData: FormData) {
 
   if (groupError || !group) {
     console.error('[addMember] Grupo não encontrado ou sem permissão:', groupError)
-    return { error: 'Grupo não encontrado ou você não tem permissão' }
+    return { error: 'Grupo não encontrado ou você não tem permissão', success: false }
   }
 
   // Verificar se já existe membro com esse nome no grupo
@@ -124,7 +164,7 @@ export async function addMember(formData: FormData) {
     .single()
 
   if (existingMember) {
-    return { error: 'Já existe um membro com esse nome no grupo' }
+    return { error: 'Já existe um membro com esse nome no grupo', success: false }
   }
 
   // Adicionar membro
@@ -143,7 +183,7 @@ export async function addMember(formData: FormData) {
 
   if (memberError || !member) {
     console.error('[addMember] Erro ao adicionar membro:', memberError)
-    return { error: 'Erro ao adicionar membro. Tente novamente.' }
+    return { error: 'Erro ao adicionar membro. Tente novamente.', success: false }
   }
 
   // Revalidar para atualizar a lista
@@ -156,7 +196,8 @@ export async function addMember(formData: FormData) {
       display_name: member.display_name,
       status: member.status,
       role: member.role,
-    }
+    },
+    message: `✅ Membro "${displayName}" adicionado com sucesso!`
   }
 }
 
@@ -167,7 +208,10 @@ export async function addMember(formData: FormData) {
 const API_BASE = 'https://v3.football.api-sports.io'
 const WORLD_CUP_LEAGUE_ID = 1
 const SEASON = '2026'
-const THROTTLE_DELAY_MS = 350 // ~3 req/sec, seguro para evitar rate limit
+// Throttle para respeitar rate limit do API-Football
+// Free Plan: 10 req/min = 1 req a cada 6 segundos
+// Usando 6500ms para estar seguro (10 req em ~65s)
+const THROTTLE_DELAY_MS = 6500
 
 // Lista oficial das 48 seleções da Copa 2026
 const WORLD_CUP_2026_COUNTRIES = [
@@ -204,8 +248,14 @@ async function apiFootballGet(endpoint: string, params: Record<string, string | 
     cache: 'no-store',
   })
 
+  // Verificar rate limit
+  if (response.status === 429) {
+    const retryAfter = response.headers.get('Retry-After') || '60'
+    throw new Error(`Rate limit atingido. Aguarde ${retryAfter}s antes de tentar novamente.`)
+  }
+
   if (!response.ok) {
-    throw new Error(`API-Football erro ${response.status}`)
+    throw new Error(`API-Football erro ${response.status}: ${response.statusText}`)
   }
 
   const json = await response.json()
@@ -264,45 +314,36 @@ export async function syncPlayers() {
     // ========================================
     // PASSO 1: Resolver IDs das 48 seleções
     // ========================================
-    console.log('[Sync] Passo 1: Resolvendo IDs das seleções...')
+    console.log('[Sync] Passo 1: Resolvendo IDs das seleções de 2026...')
 
     // Cache em memória dos IDs resolvidos
     const teamIdMap = new Map<string, { id: number; apiName: string }>()
 
-    // Buscar times da Copa 2022 (muitos IDs já estarão aqui)
-    console.log('[Sync] Buscando times da Copa 2022 para cache inicial...')
-    await sleep(THROTTLE_DELAY_MS)
-    const teams2022 = await apiFootballGet('/teams', {
-      league: WORLD_CUP_LEAGUE_ID,
-      season: 2022,
-    })
+    // Verificar times já sincronizados no banco
+    console.log('[Sync] Verificando times já sincronizados...')
+    const { data: existingTeams } = await admin
+      .from('teams')
+      .select('country, id, api_name, synced_at')
+      .eq('season', SEASON)
+      .eq('national', true)
 
-    console.log(`[Sync] Encontrados ${teams2022.length} times na Copa 2022`)
-
-    // Mapear times conhecidos
-    for (const item of teams2022) {
-      const teamName = item.team?.name
-      const teamId = item.team?.id
-      const country = item.team?.country
-
-      if (!teamName || !teamId) continue
-
-      // Verificar se esse time está na nossa lista (comparar por país)
-      const matchingCountry = WORLD_CUP_2026_COUNTRIES.find(c => {
-        const apiName = COUNTRY_NAME_MAPPING[c] || c
-        return teamName === apiName || country === c
-      })
-
-      if (matchingCountry) {
-        teamIdMap.set(matchingCountry, { id: teamId, apiName: teamName })
-        console.log(`[Sync] ✓ ${matchingCountry} → ID ${teamId} (${teamName})`)
+    const existingCountries = new Set<string>()
+    if (existingTeams) {
+      for (const team of existingTeams) {
+        const country = team.country
+        teamIdMap.set(country, { id: team.id, apiName: team.api_name })
+        existingCountries.add(country)
+        console.log(`[Sync] ✓ ${country} (já sincronizado, ID: ${team.id})`)
       }
     }
 
-    // Resolver países que faltaram
-    const pendingCountries = WORLD_CUP_2026_COUNTRIES.filter(c => !teamIdMap.has(c))
-    console.log(`[Sync] Países pendentes: ${pendingCountries.length}`)
+    // Buscar apenas países pendentes
+    const pendingCountries = WORLD_CUP_2026_COUNTRIES.filter(
+      (c) => !existingCountries.has(c)
+    )
+    console.log(`[Sync] Pendentes: ${pendingCountries.length} de 48`)
 
+    // Buscar cada seleção da lista pendente
     for (const country of pendingCountries) {
       const searchName = COUNTRY_NAME_MAPPING[country] || country
       console.log(`[Sync] Buscando "${searchName}"...`)
@@ -311,8 +352,14 @@ export async function syncPlayers() {
         await sleep(THROTTLE_DELAY_MS)
         const searchResults = await apiFootballGet('/teams', { search: searchName })
 
-        // Filtrar por seleção nacional
-        const nationalTeam = searchResults.find((item: any) => item.team?.national === true)
+        // Filtrar por seleção nacional, excluindo times femininos (W), sub-23 (U23), etc.
+        const nationalTeam = searchResults.find((item: any) => {
+          const isNational = item.team?.national === true
+          const teamName = item.team?.name || ''
+          // Excluir sufixos de times femininos, sub-categorias, etc.
+          const hasFeminineOrSubSuffix = / [WU]\d*$/.test(teamName) || teamName.includes(' U20') || teamName.includes(' U17')
+          return isNational && !hasFeminineOrSubSuffix
+        })
 
         if (nationalTeam) {
           const teamId = nationalTeam.team.id
@@ -331,8 +378,8 @@ export async function syncPlayers() {
 
     results.teamsResolved = teamIdMap.size
 
-    // Salvar IDs no cache (tabela teams)
-    console.log('[Sync] Salvando cache de times...')
+    console.log(`[Sync] Times encontrados: ${results.teamsResolved} / 48`)
+    console.log(`[Sync] Salvando cache de times...`)
     for (const [country, { id, apiName }] of Array.from(teamIdMap.entries())) {
       await admin
         .from('teams')
@@ -352,9 +399,31 @@ export async function syncPlayers() {
     // ========================================
     console.log(`[Sync] Passo 2: Sincronizando elencos de ${teamIdMap.size} seleções...`)
 
+    // Verificar times que já têm jogadores sincronizados
+    const { data: allPlayers } = await admin
+      .from('players')
+      .select('team_id')
+      .eq('season', SEASON)
+
+    const teamsAlreadySynced = new Set<number>()
+    if (allPlayers) {
+      for (const { team_id } of allPlayers) {
+        teamsAlreadySynced.add(team_id)
+      }
+    }
+
+    const teamsToSync = Array.from(teamIdMap.entries()).filter(
+      ([_, { id: teamId }]) => !teamsAlreadySynced.has(teamId)
+    )
+
+    console.log(`[Sync] ${teamsToSync.length} times precisam sincronizar elencos`)
+    if (teamsToSync.length < teamIdMap.size) {
+      console.log(`[Sync] ${teamsAlreadySynced.size} times já têm jogadores (pulando)`)
+    }
+
     let totalPlayersInserted = 0
 
-    for (const [country, { id: teamId, apiName: teamName }] of Array.from(teamIdMap.entries())) {
+    for (const [country, { id: teamId, apiName: teamName }] of teamsToSync) {
       console.log(`[Sync] Sincronizando ${country} (${teamName}, ID: ${teamId})...`)
 
       try {
@@ -371,26 +440,27 @@ export async function syncPlayers() {
 
         console.log(`[Sync] ${country}: ${players.length} jogadores`)
 
-        // Inserir jogadores (upsert por api_player_id)
+        // Inserir jogadores (upsert por id da API)
         for (const player of players) {
           const playerData = {
-            api_player_id: player.id,
+            id: player.id, // player_id da API, é a primary key
             name: player.name,
             team_id: teamId,
             team_name: teamName,
-            api_position: player.position, // Goalkeeper/Defender/Midfielder/Attacker
             position: mapPosition(player.position), // GK/ZAG/LAT/MEI/ATK
-            age: player.age,
-            number: player.number,
+            api_position: player.position, // Goalkeeper/Defender/Midfielder/Attacker (original)
+            age: player.age || null,
+            number: player.number || null,
             photo_url: player.photo || null,
+            api_player_id: player.id, // Redundante com id, mas usamos se necessário depois
             season: SEASON,
             synced_at: new Date().toISOString(),
           }
 
-          // Upsert pelo api_player_id
+          // Upsert pela primary key (id)
           const { error } = await admin
             .from('players')
-            .upsert(playerData, { onConflict: 'api_player_id' })
+            .upsert(playerData, { onConflict: 'id' })
 
           if (error) {
             console.error(`[Sync] Erro ao inserir ${player.name}:`, error.message)
@@ -426,8 +496,12 @@ export async function syncPlayers() {
 
     revalidatePath('/admin')
 
+    // Preparar mensagem de sucesso
+    const successMsg = `✅ Sincronização concluída! ${results.teamsResolved} seleções, ${results.playersInserted} jogadores.${results.teamsPending.length > 0 ? ` (${results.teamsPending.length} seleções pendentes)` : ''}`
+
     return {
       success: true,
+      message: successMsg,
       ...results,
     }
   } catch (error: any) {

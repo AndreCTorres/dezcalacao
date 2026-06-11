@@ -6,6 +6,12 @@
 import { useState } from 'react'
 import { createGroup } from './actions'
 
+function showToast(message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') {
+  if (typeof window !== 'undefined' && (window as any).showToast) {
+    (window as any).showToast(message, type, 3000)
+  }
+}
+
 export function CreateGroupForm() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -22,6 +28,14 @@ export function CreateGroupForm() {
 
     if (result.error) {
       setError(result.error)
+      showToast(result.error, 'error')
+    } else if (result.success && result.message) {
+      showToast(result.message, 'success')
+      // Resetar formulário após sucesso
+      const form = e.currentTarget as HTMLFormElement
+      if (form) {
+        form.reset()
+      }
     }
     // Se sucesso, a página será revalidada automaticamente pelo revalidatePath
   }

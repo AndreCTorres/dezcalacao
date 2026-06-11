@@ -2,8 +2,10 @@
 // Painel principal do grupo (quando o usuário já tem um grupo).
 
 import { LogoutButton } from '../components/logout-button'
+import { ModeSwitcher } from '../components/mode-switcher'
 import { AddMemberForm } from './add-member-form'
 import { SyncPlayersButton } from './sync-players-button'
+import { SeedUsersButton } from './seed-users-button'
 import Link from 'next/link'
 
 type Group = {
@@ -18,6 +20,7 @@ type GroupMember = {
   display_name: string
   role: string
   status: string
+  profile_id?: string | null
 }
 
 type GroupPanelProps = {
@@ -34,95 +37,159 @@ export function GroupPanel({ group, members, isAdmin }: GroupPanelProps) {
     finished: 'Finalizado',
   }
 
+  const statusEmojis: Record<string, string> = {
+    setup: '⚙️',
+    drafting: '📋',
+    active: '🟢',
+    finished: '🏁',
+  }
+
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-8">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="flex justify-between items-start mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-lime-400 mb-2">
+    <div
+      className="min-h-screen text-white"
+      style={{ background: '#0a0e0c' }}
+    >
+      <div className="max-w-6xl mx-auto px-4 py-6 sm:px-6 sm:py-8">
+        {/* Header com modo switcher */}
+        <div className="flex justify-between items-start mb-8 gap-4">
+          <div className="flex-1">
+            <Link href="/" className="text-lime-400 hover:text-lime-300 text-sm mb-3 inline-block">
+              ← Dezcalação
+            </Link>
+            <h1
+              className="text-3xl sm:text-4xl font-black text-lime-400 tracking-tight mb-3"
+              style={{ fontFamily: 'Anton, sans-serif', textTransform: 'uppercase' }}
+            >
               {group.name}
             </h1>
-            <div className="flex gap-4 text-sm text-gray-400">
-              <span>Temporada: {group.season}</span>
-              <span>•</span>
-              <span>Status: {statusLabels[group.status] || group.status}</span>
+            <div className="flex flex-wrap gap-3 items-center text-sm">
+              <span className="text-gray-400">
+                Temporada <span className="text-white font-semibold">{group.season}</span>
+              </span>
+              <span className="text-gray-600">•</span>
+              <span className="flex items-center gap-2">
+                <span>{statusEmojis[group.status] || '❓'}</span>
+                <span className="text-gray-300">{statusLabels[group.status] || group.status}</span>
+              </span>
               {isAdmin && (
                 <>
-                  <span>•</span>
-                  <span className="text-lime-400">Você é admin</span>
+                  <span className="text-gray-600">•</span>
+                  <span className="inline-block px-2 py-1 bg-lime-400/20 text-lime-400 rounded text-xs font-medium">
+                    🔑 Admin
+                  </span>
                 </>
               )}
             </div>
           </div>
-          <LogoutButton />
+          <div className="flex flex-col gap-3 items-end">
+            {isAdmin && (
+              <Link
+                href={`/app?group=${group.id}`}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition flex items-center gap-2"
+              >
+                👁️ Ver como Participante
+              </Link>
+            )}
+            <ModeSwitcher isAdmin={isAdmin} />
+            <LogoutButton />
+          </div>
         </div>
 
-        {/* Grid de cards */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-6">
+        {/* Grid de cards principais */}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
           {/* Card: Membros */}
-          <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-            <h2 className="text-xl font-bold text-white mb-4">
-              Membros ({members.length})
-            </h2>
-            <div className="space-y-3 max-h-96 overflow-y-auto">
+          <div className="bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700/50 hover:border-gray-600/50 transition">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-lime-400">👥 Membros</h2>
+              <span className="bg-lime-400/20 text-lime-400 text-sm px-2 py-1 rounded-lg font-semibold">
+                {members.length}
+              </span>
+            </div>
+            <div className="space-y-2 max-h-80 overflow-y-auto">
               {members.length === 0 ? (
-                <p className="text-gray-400 text-sm">Nenhum membro ainda</p>
+                <p className="text-gray-500 text-sm py-4 text-center">Nenhum membro ainda</p>
               ) : (
                 members.map((member) => (
                   <div
                     key={member.id}
-                    className="flex justify-between items-center p-3 bg-gray-700/50 rounded-lg"
+                    className="flex justify-between items-center p-3 bg-gray-700/30 hover:bg-gray-700/50 rounded-lg transition border border-gray-700/30"
                   >
-                    <div>
-                      <p className="text-white font-medium">{member.display_name}</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white font-medium text-sm truncate">{member.display_name}</p>
                       {member.role === 'admin' && (
-                        <p className="text-xs text-lime-400">Admin</p>
+                        <p className="text-xs text-lime-400 font-semibold mt-0.5">🔑 Admin</p>
                       )}
                     </div>
-                    <span
-                      className={`text-xs px-2 py-1 rounded ${
-                        member.status === 'joined'
-                          ? 'bg-lime-400/20 text-lime-400'
-                          : 'bg-gray-600 text-gray-300'
-                      }`}
-                    >
-                      {member.status === 'joined' ? 'Ativo' : 'Convidado'}
-                    </span>
+                    <div className="flex items-center gap-2 ml-2 flex-shrink-0">
+                      <span
+                        className={`text-xs px-2.5 py-1 rounded-full font-medium ${
+                          member.status === 'joined'
+                            ? 'bg-lime-400/20 text-lime-400'
+                            : 'bg-yellow-500/20 text-yellow-300'
+                        }`}
+                      >
+                        {member.status === 'joined' ? '✓ Ativo' : '⏳ Convidado'}
+                      </span>
+                      {/* Botão de visualização — sempre visível para o admin */}
+                      {isAdmin && (
+                        <Link
+                          href={`/admin/view-member/${member.id}`}
+                          className="text-xs px-2.5 py-1 rounded-full font-medium transition"
+                          style={{
+                            background: 'rgba(197,242,74,.1)',
+                            color: '#c5f24a',
+                            border: '1px solid rgba(197,242,74,.25)',
+                          }}
+                          title={`Ver visão de ${member.display_name}`}
+                        >
+                          👁️
+                        </Link>
+                      )}
+                    </div>
                   </div>
                 ))
               )}
             </div>
             
             {/* Formulário de adicionar membro (só para admin) */}
-            {isAdmin && <AddMemberForm groupId={group.id} />}
+            {isAdmin && (
+              <div className="space-y-3 mt-6 pt-6 border-t border-gray-700/50">
+                <AddMemberForm groupId={group.id} />
+                <SeedUsersButton groupId={group.id} />
+              </div>
+            )}
           </div>
 
-          {/* Card: Draft */}
-          <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-            <h2 className="text-xl font-bold text-white mb-4">
-              Jogadores
-            </h2>
-            {isAdmin && (
+          {/* Card: Sincronizar Jogadores */}
+          <div className="bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700/50 hover:border-gray-600/50 transition">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-lime-400">⚽ Jogadores</h2>
+              <span className="text-xl">🔄</span>
+            </div>
+            {isAdmin ? (
               <div className="space-y-4">
                 <p className="text-gray-400 text-sm">
-                  Sincronize os convocados da Copa 2026 antes do draft
+                  Sincronize os convocados da Copa 2026 antes do draft.
                 </p>
                 <SyncPlayersButton />
               </div>
-            )}
-            {!isAdmin && (
-              <p className="text-gray-400 text-sm">
+            ) : (
+              <p className="text-gray-500 text-sm py-4">
                 Apenas o admin pode sincronizar jogadores
               </p>
             )}
           </div>
 
           {/* Card: Draft */}
-          <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-            <h2 className="text-xl font-bold text-white mb-4">
-              Draft
-            </h2>
+          <div className="bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700/50 hover:border-gray-600/50 transition">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-lime-400">🏆 Draft</h2>
+              <span className="text-xl">
+                {group.status === 'setup' ? '⏳' : 
+                 group.status === 'drafting' ? '🎯' :
+                 '✅'}
+              </span>
+            </div>
             {group.status === 'setup' ? (
               <div className="space-y-4">
                 <p className="text-gray-400 text-sm">
@@ -133,12 +200,12 @@ export function GroupPanel({ group, members, isAdmin }: GroupPanelProps) {
                     href="/admin/draft"
                     className="block w-full py-2 px-4 bg-lime-400 hover:bg-lime-500 text-gray-900 text-center font-semibold rounded-lg transition"
                   >
-                    Iniciar draft
+                    ▶️ Iniciar Draft
                   </Link>
                 )}
                 {isAdmin && members.length <= 1 && (
-                  <p className="text-xs text-gray-500">
-                    Adicione pelo menos 2 membros para iniciar o draft
+                  <p className="text-xs text-gray-500 bg-gray-900/50 p-3 rounded-lg">
+                    ⚠️ Adicione pelo menos 2 membros para iniciar
                   </p>
                 )}
               </div>
@@ -152,7 +219,7 @@ export function GroupPanel({ group, members, isAdmin }: GroupPanelProps) {
                     href="/admin/draft"
                     className="block w-full py-2 px-4 bg-gray-700 hover:bg-gray-600 text-white text-center font-medium rounded-lg transition"
                   >
-                    Ir para o draft
+                    Ir para o Draft
                   </Link>
                 )}
               </div>
@@ -160,37 +227,55 @@ export function GroupPanel({ group, members, isAdmin }: GroupPanelProps) {
           </div>
 
           {/* Card: Rodadas */}
-          <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-            <h2 className="text-xl font-bold text-white mb-4">
-              Rodadas
-            </h2>
+          <div className="bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700/50 hover:border-gray-600/50 transition">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-lime-400">📊 Rodadas</h2>
+              <span className="text-xl">⏱️</span>
+            </div>
             <p className="text-gray-400 text-sm mb-4">
-              Gerencie as rodadas do torneio e calcule pontuações
+              Gerencie rodadas do torneio e calcule pontuações.
             </p>
             {isAdmin && (
               <Link
                 href="/admin/rodadas"
                 className="block w-full py-2 px-4 bg-gray-700 hover:bg-gray-600 text-white text-center font-medium rounded-lg transition"
               >
-                Gerenciar rodadas
+                Gerenciar Rodadas
               </Link>
             )}
           </div>
         </div>
 
-        {/* Info adicional */}
-        <div className="mt-8 p-6 bg-gray-800 rounded-lg border border-gray-700">
-          <h3 className="text-lg font-bold text-white mb-2">
-            Próximos passos
+        {/* Seção de próximos passos */}
+        <div className="bg-gradient-to-r from-gray-800/50 to-gray-800/30 backdrop-blur rounded-xl p-6 border border-gray-700/50">
+          <h3 className="text-lg font-bold text-lime-400 mb-4 flex items-center gap-2">
+            🚀 Próximos Passos
           </h3>
-          <ol className="list-decimal list-inside space-y-2 text-gray-300 text-sm">
-            <li className={members.length >= 2 ? 'line-through text-gray-500' : ''}>
-              Adicione membros ao grupo (mínimo 2 para jogar)
+          <ol className="space-y-3 text-gray-300 text-sm">
+            <li className={`flex items-start gap-3 ${members.length >= 2 ? 'opacity-50' : ''}`}>
+              <span className={`font-bold flex-shrink-0 mt-0.5 ${members.length >= 2 ? 'text-gray-500' : 'text-lime-400'}`}>
+                {members.length >= 2 ? '✓' : '1.'}
+              </span>
+              <span className={members.length >= 2 ? 'line-through text-gray-500' : ''}>
+                Adicione membros ao grupo (mínimo 2 para jogar)
+              </span>
             </li>
-            <li>Sincronize os jogadores convocados da API</li>
-            <li>Faça o draft atribuindo jogadores aos membros</li>
-            <li>Configure e gerencie as rodadas</li>
-            <li>Calcule as pontuações após cada rodada</li>
+            <li className="flex items-start gap-3">
+              <span className="font-bold flex-shrink-0 text-lime-400 mt-0.5">2.</span>
+              <span>Sincronize os jogadores convocados da API-Football</span>
+            </li>
+            <li className="flex items-start gap-3">
+              <span className="font-bold flex-shrink-0 text-lime-400 mt-0.5">3.</span>
+              <span>Realize o draft atribuindo jogadores aos membros</span>
+            </li>
+            <li className="flex items-start gap-3">
+              <span className="font-bold flex-shrink-0 text-lime-400 mt-0.5">4.</span>
+              <span>Configure e gerencie as rodadas do torneio</span>
+            </li>
+            <li className="flex items-start gap-3">
+              <span className="font-bold flex-shrink-0 text-lime-400 mt-0.5">5.</span>
+              <span>Calcule as pontuações após cada rodada</span>
+            </li>
           </ol>
         </div>
       </div>

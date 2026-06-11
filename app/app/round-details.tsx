@@ -4,7 +4,6 @@
 // Exibe detalhes de pontuação por rodada
 
 import { useState, useEffect } from 'react'
-import { supabaseAdmin } from '@/lib/supabase-server'
 
 type RoundDetail = {
   roundId: string

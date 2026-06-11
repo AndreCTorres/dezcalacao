@@ -157,20 +157,36 @@ export async function closeRound(groupId: string, roundId: string) {
     console.log(`[Rounds] ✓ Ratings inseridos: ${ratingsInserted}, Erros: ${ratingsErrors}`)
 
     // ========================================
-    // PASSO 3: Calcular pontuação de todos os membros
+    // PASSO 3: Calcular pontuação de todos os membros (com transação implícita)
     // ========================================
-    console.log('[Rounds] Passo 3: Calculando pontuação...')
-    const scoreResult = await calculateRoundScores(groupId, roundId)
+    console.log('[Rounds] Passo 3: Calculando pontuação (transação de cálculo)...')
+    
+    // ✅ CRÍTICO: Usar try-catch para guarantir rollback se algo falhar
+    let scoringSucceeded = false
+    let scoreResult: any = null
 
-    if (!scoreResult.success) {
-      throw new Error(`Erro ao calcular pontuação: ${scoreResult.error}`)
+    try {
+      scoreResult = await calculateRoundScores(groupId, roundId)
+
+      if (!scoreResult.success) {
+        throw new Error(`Erro ao calcular pontuação: ${scoreResult.error}`)
+      }
+
+      console.log(`[Rounds] ✓ Pontuação calculada para ${scoreResult.count} membros`)
+      scoringSucceeded = true
+    } catch (scoringError: any) {
+      console.error('[Rounds] ❌ Falha no cálculo de pontuação (rollback):', scoringError.message)
+      // Não atualizar rodada para 'scored' se cálculo falhar
+      // Ratings já foram inseridos, mas round_scores estará vazio/incompleto
+      // Admin pode tentar novamente
+      throw new Error(`Falha no cálculo de pontuação: ${scoringError.message}. Scores não foram salvos. Tente novamente.`)
     }
 
-    console.log(`[Rounds] ✓ Pontuação calculada para ${scoreResult.count} membros`)
+    // ========================================
+    // PASSO 4: Atualizar status da rodada para 'scored' (APENAS se tudo sucedeu)
+    // ========================================
+    console.log('[Rounds] Passo 4: Finalizando rodada...')
 
-    // ========================================
-    // PASSO 4: Atualizar status da rodada para 'scored'
-    // ========================================
     const { error: updateError } = await admin
       .from('rounds')
       .update({ status: 'scored', locked_at: new Date().toISOString() })
@@ -180,13 +196,13 @@ export async function closeRound(groupId: string, roundId: string) {
       throw new Error(`Erro ao atualizar rodada: ${updateError.message}`)
     }
 
-    console.log('[Rounds] ✓ Rodada fechada com sucesso')
+    console.log('[Rounds] ✅ Rodada fechada com SUCESSO (estado consistente)')
     revalidatePath('/admin/rodadas')
     revalidatePath('/app')
 
     return {
       success: true,
-      message: `Rodada fechada! ${ratingsInserted} ratings processados, ${scoreResult.count} membros pontuados.`,
+      message: `✅ Rodada fechada com sucesso! ${ratingsInserted} ratings processados, ${scoreResult.count} membros pontuados.`,
       stats: {
         ratingsInserted,
         ratingsErrors,
@@ -194,10 +210,11 @@ export async function closeRound(groupId: string, roundId: string) {
       },
     }
   } catch (error: any) {
-    console.error('[Rounds] ❌ Erro ao fechar rodada:', error.message)
+    console.error('[Rounds] ❌ ERRO AO FECHAR RODADA (transação falhou):', error.message)
+    // Importante: Rodada não foi marcada como 'scored', então fica disponível para retry
     return {
       success: false,
-      error: error.message || 'Erro ao fechar rodada',
+      error: `❌ ERRO: ${error.message || 'Erro desconhecido ao fechar rodada'}\n\nA rodada NÃO foi marcada como concluída. Tente novamente ou contacte suporte.`,
     }
   }
 }

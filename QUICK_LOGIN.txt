@@ -1,0 +1,35 @@
+⚡ QUICK LOGIN (30 segundos)
+═══════════════════════════════════════════════════════════════
+
+1. Abrir terminal:
+   cd c:\Users\André\Downloads\Dezcalação\dezcalacao-starter
+
+2. Rodar comando (Windows PowerShell):
+   $response = Invoke-RestMethod -Uri "http://localhost:3000/api/test-auth" `
+     -Method POST `
+     -Headers @{"Content-Type"="application/json"} `
+     -Body '{"email":"teste@example.com"}'
+   
+   Start-Process $response.testLink
+
+3. PRONTO! 🎉
+   - Navegador abre automaticamente
+   - Você já está logado em /admin
+   - Comece a testar as correções!
+
+═══════════════════════════════════════════════════════════════
+
+OU (se preferir cURL):
+
+curl -s -X POST http://localhost:3000/api/test-auth \
+  -H "Content-Type: application/json" \
+  -d '{"email":"teste@example.com"}' | jq '.testLink' -r
+
+Copia o link que sai e abre no navegador.
+
+═══════════════════════════════════════════════════════════════
+
+Precisou? Ver:
+- GET_LOGIN_LINK.md       (explicação completa)
+- LOGIN_PASSO_A_PASSO.md  (passo-a-passo visual)
+- test.http               (REST Client para VS Code)

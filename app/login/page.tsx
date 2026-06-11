@@ -18,28 +18,54 @@ export default function LoginPage({
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 flex items-center justify-center px-4">
+    <div
+      className="min-h-screen flex items-center justify-center px-4"
+      style={{ background: '#0a0e0c' }}
+    >
       <div className="w-full max-w-md">
+        {/* Logo */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-lime-400 mb-2">
-            Dezcalação
-          </h1>
-          <p className="text-gray-400">
-            Entre com seu e-mail para continuar
+          <div
+            className="text-4xl font-black tracking-tight mb-3"
+            style={{ fontFamily: 'Anton, sans-serif', textTransform: 'uppercase' }}
+          >
+            <span style={{ color: '#c5f24a' }}>DEZ</span>
+            <span className="text-white">calação</span>
+          </div>
+          <p className="text-gray-400 text-sm">
+            Copa do Mundo 2026 · Fantasy Draft
           </p>
         </div>
 
-        <div className="bg-gray-800 rounded-lg shadow-xl p-8 border border-gray-700">
+        {/* Card */}
+        <div
+          className="rounded-2xl shadow-2xl p-8"
+          style={{
+            background: 'linear-gradient(160deg, #111b16, #0c1410)',
+            border: '1px solid rgba(197,242,74,.14)',
+          }}
+        >
+          {/* Instrução contextual */}
+          <div
+            className="mb-6 p-4 rounded-xl text-sm"
+            style={{ background: 'rgba(197,242,74,.07)', border: '1px solid rgba(197,242,74,.15)' }}
+          >
+            <p className="text-gray-300 leading-relaxed">
+              👋 Use o <span style={{ color: '#c5f24a' }} className="font-semibold">nome de usuário e senha que o André te passou</span>. Você vai entrar direto no seu time.
+            </p>
+          </div>
+
           {errorMessage && (
             <div className="mb-6 p-4 rounded-lg bg-red-500/10 text-red-400 border border-red-400/20 text-sm">
               {errorMessage}
             </div>
           )}
+
           <LoginForm />
         </div>
 
-        <p className="text-center text-sm text-gray-500 mt-6">
-          Você receberá um link mágico no seu e-mail para fazer login
+        <p className="text-center text-xs mt-6" style={{ color: '#5d6661' }}>
+          Sem senha. Sem cadastro. Só clica no link que chega no seu e-mail.
         </p>
       </div>
     </div>

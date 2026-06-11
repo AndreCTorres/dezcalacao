@@ -1,0 +1,28 @@
+### 🔓 GERAR LINK DE LOGIN (Teste Auth)
+### Use isto para conseguir acesso sem email real
+POST http://localhost:3000/api/test-auth
+Content-Type: application/json
+
+{
+  "email": "teste@example.com"
+}
+
+### 📋 Copie o "testLink" da resposta acima e abra no navegador
+### Isso vai criar um usuário e logar você automaticamente
+
+### ─────────────────────────────────────────────────────────
+
+### 🏠 Admin Page (após logado)
+GET http://localhost:3000/admin
+
+### 📊 App Page (Dashboard participante)
+GET http://localhost:3000/app
+
+### ─────────────────────────────────────────────────────────
+
+### 🧪 Test Football API
+GET http://localhost:3000/api/test-football
+
+### 🔧 Fix Schema Cache
+POST http://localhost:3000/api/fix-schema-cache
+Content-Type: application/json

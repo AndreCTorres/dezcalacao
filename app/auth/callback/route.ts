@@ -11,56 +11,58 @@ export async function GET(request: Request) {
   const code = searchParams.get('code')
   const next = searchParams.get('next') ?? '/admin'
 
-  console.log('[Callback] Recebendo callback de autenticação')
-  console.log('[Callback] Code presente:', !!code)
-  console.log('[Callback] Origin:', origin)
   console.log('[Callback] URL completa:', request.url)
+  console.log('[Callback] Params:', {
+    code: !!code,
+    token: !!searchParams.get('token'),
+    type: searchParams.get('type'),
+  })
 
-  if (code) {
-    const cookieStore = cookies()
-    
-    // Log dos cookies presentes (para debug do PKCE)
-    const allCookies = cookieStore.getAll()
-    const pkceCookies = allCookies.filter(c => c.name.includes('pkce') || c.name.includes('code_verifier'))
-    console.log('[Callback] Cookies PKCE encontrados:', pkceCookies.length > 0 ? 'SIM' : 'NÃO')
-    if (pkceCookies.length > 0) {
-      console.log('[Callback] Cookies PKCE:', pkceCookies.map(c => c.name))
-    }
-    
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          get(name: string) {
-            return cookieStore.get(name)?.value
-          },
-          set(name: string, value: string, options: CookieOptions) {
-            cookieStore.set({ name, value, ...options })
-          },
-          remove(name: string, options: CookieOptions) {
-            cookieStore.set({ name, value: '', ...options })
-          },
+  const cookieStore = cookies()
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll()
         },
-      }
-    )
-
-    console.log('[Callback] Trocando code por sessão...')
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
-
-    if (!error) {
-      console.log('[Callback] ✓ Sessão criada com sucesso')
-      console.log('[Callback] Redirecionando para:', next)
-      // Redireciona para /admin após login bem-sucedido
-      return NextResponse.redirect(`${origin}${next}`)
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            cookieStore.set({ name, value, ...options })
+          })
+        },
+      },
     }
+  )
 
-    console.error('[Callback] ✗ Erro ao trocar code por sessão:', error)
-    console.error('[Callback] Tipo do erro:', error.name)
-    console.error('[Callback] Mensagem:', error.message)
+  // Fluxo 1: OTP com code (magic link padrão)
+  if (code) {
+    console.log('[Callback] Processando OTP com code...')
+    try {
+      const { error, data } = await supabase.auth.exchangeCodeForSession(code)
+
+      if (!error && data.session) {
+        console.log('[Callback] ✓ Sessão criada para:', data.session.user.email)
+        return NextResponse.redirect(`${origin}${next}`)
+      }
+
+      if (error) {
+        console.error('[Callback] ✗ Erro:', error.message)
+      }
+    } catch (err) {
+      console.error('[Callback] ✗ Exceção:', err)
+    }
   }
 
-  // Se chegou aqui, algo deu errado. Redireciona para login com mensagem de erro.
-  console.log('[Callback] Falha na autenticação, redirecionando para /login')
-  return NextResponse.redirect(`${origin}/login?error=auth_failed`)
+  // Fluxo 2: Fluxo implícito — o Supabase redireciona com #access_token no hash.
+  // O servidor não consegue ler o hash (não é enviado pelo browser),
+  // então redirecionamos para uma página client-side que lê e processa.
+  console.log('[Callback] Nenhum code encontrado — pode ser fluxo implícito com hash.')
+  console.log('[Callback] Redirecionando para /auth/processing para tratamento client-side...')
+
+  return NextResponse.redirect(`${origin}/auth/processing`)
 }
+
+

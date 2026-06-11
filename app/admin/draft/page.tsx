@@ -1,7 +1,68 @@
-// app/admin/draft/page.tsx — tela de draft (registrada pelo admin).
-// Fluxo: escolher membro -> buscar jogador na lista de convocados -> atribuir
-// (validando "um por seleção" e os slots de posição) -> repetir -> "fechar draft".
-// NÃO é ao vivo: o draft rola no Discord, aqui só registra o resultado.
-export default function DraftAdmin() {
-  return <main><h1>Draft</h1><p>TODO: atribuir jogadores aos membros e fechar o draft.</p></main>;
+// app/admin/draft/page.tsx
+// Página de draft: admin atribui jogadores aos membros
+
+import { createActionClient, supabaseAdmin } from '@/lib/supabase-server'
+import { redirect } from 'next/navigation'
+import Link from 'next/link'
+import { DraftInterface } from './draft-interface'
+
+export default async function DraftPage() {
+  // Validar autenticação
+  const supabase = createActionClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    redirect('/login')
+  }
+
+  // Buscar grupo do admin
+  const admin = supabaseAdmin()
+  const { data: group } = await admin
+    .from('groups')
+    .select('id, name, status')
+    .eq('admin_id', user.id)
+    .single()
+
+  if (!group) {
+    redirect('/admin')
+  }
+
+  // Buscar membros
+  const { data: members } = await admin
+    .from('group_members')
+    .select('id, display_name, profile_id, status')
+    .eq('group_id', group.id)
+    .order('display_name', { ascending: true })
+
+  return (
+    <div className="min-h-screen bg-gray-900 text-white p-8">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="mb-8">
+          <Link href="/admin" className="text-lime-400 hover:text-lime-300 text-sm mb-4 inline-block">
+            ← Voltar para admin
+          </Link>
+          <h1 className="text-4xl font-bold text-lime-400 mb-2">
+            {group.name} — Draft
+          </h1>
+          <p className="text-gray-400">
+            {group.status === 'setup' ? (
+              <>Registre os jogadores de cada membro. O draft termina quando todos têm 16 jogadores (11 titulares + 5 reservas).</>
+            ) : (
+              <>Draft fechado. Grupo ativo.</>
+            )}
+          </p>
+        </div>
+
+        {/* Draft Interface */}
+        {group.status === 'setup' ? (
+          <DraftInterface groupId={group.id} members={members || []} />
+        ) : (
+          <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+            <p className="text-gray-400">O draft já foi finalizado. Status: {group.status}</p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
 }

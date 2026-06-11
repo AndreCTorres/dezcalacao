@@ -381,8 +381,11 @@ if (typeof window !== 'undefined' && (window as any).showToast) {
 - **API-Football:** `lib/apiFootball.ts`
 - **Substituições:** `app/app/substitutions-actions.ts` (server) + `app/app/substitution-interface.tsx` (UI)
 - **Ranking:** `app/app/standings-actions.ts` (server) + `app/app/participant-standings.tsx` (UI)
-- **Docs:** `docs/` (começar com `BRIEF.md`)
-- **Convenções:** Este arquivo
+- **Docs:** `docs/BRIEF.md` (spec do produto) + `docs/ARCHITECTURE.md` (arquitetura técnica) + `docs/TESTING.md` (guia de testes)
+- **Steering files:**
+  - `PROJETO.md` — Convenções, regras e contexto (este arquivo, sempre incluído)
+  - `SETUP.md` — Configuração do ambiente (incluir com `#SETUP`)
+  - `DEV_REFERENCE.md` — Cheat sheet de rotas, actions e componentes (incluir com `#DEV_REFERENCE`)
 
 ---
 

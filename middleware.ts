@@ -29,8 +29,7 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // Refresh da sessão se necessário - IMPORTANTE para atualizar tokens
-  // getUser() também faz refresh automático do token se estiver perto de expirar
+  // Refresh da sessão se necessário
   const {
     data: { user },
   } = await supabase.auth.getUser()
@@ -38,7 +37,7 @@ export async function middleware(request: NextRequest) {
   console.log('[Middleware] Path:', request.nextUrl.pathname)
   console.log('[Middleware] User:', user?.email || 'não autenticado')
 
-  // Se está tentando acessar rotas protegidas sem estar logado, redireciona para login
+  // Se está tentando acessar rotas protegidas sem estar logado
   if (!user && (request.nextUrl.pathname.startsWith('/admin') || request.nextUrl.pathname.startsWith('/app'))) {
     console.log('[Middleware] ✗ Acesso negado - redirecionando para /login')
     const redirectUrl = request.nextUrl.clone()
@@ -47,12 +46,41 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(redirectUrl)
   }
 
-  // Se está logado e tenta acessar /login, redireciona para /admin
+  // Se está logado e tenta acessar /login
   if (user && request.nextUrl.pathname === '/login') {
-    console.log('[Middleware] ✓ Já autenticado - redirecionando para /admin')
+    console.log('[Middleware] ✓ Já autenticado - verificando role...')
+    
+    // Verificar se é admin de algum grupo
+    const { data: adminGroups } = await supabase
+      .from('groups')
+      .select('id')
+      .eq('admin_id', user.id)
+      .limit(1)
+
+    const isAdmin = adminGroups && adminGroups.length > 0
+
     const redirectUrl = request.nextUrl.clone()
-    redirectUrl.pathname = '/admin'
+    redirectUrl.pathname = isAdmin ? '/admin' : '/app'
+    console.log(`[Middleware] Redirecionando para ${isAdmin ? '/admin' : '/app'}`)
     return NextResponse.redirect(redirectUrl)
+  }
+
+  // Se está tentando acessar /admin mas não é admin
+  if (user && request.nextUrl.pathname.startsWith('/admin')) {
+    const { data: adminGroups } = await supabase
+      .from('groups')
+      .select('id')
+      .eq('admin_id', user.id)
+      .limit(1)
+
+    const isAdmin = adminGroups && adminGroups.length > 0
+
+    if (!isAdmin) {
+      console.log('[Middleware] ✗ Não é admin - redirecionando para /app')
+      const redirectUrl = request.nextUrl.clone()
+      redirectUrl.pathname = '/app'
+      return NextResponse.redirect(redirectUrl)
+    }
   }
 
   console.log('[Middleware] ✓ Permitindo acesso')
