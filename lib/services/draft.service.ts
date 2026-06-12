@@ -34,6 +34,17 @@ export async function validatePlayerSelection(
     return { valid: false, error: 'Slot inválido' }
   }
 
+  const { data: member, error: memberError } = await admin
+    .from('group_members')
+    .select('id')
+    .eq('id', memberId)
+    .eq('group_id', groupId)
+    .single()
+
+  if (memberError || !member) {
+    return { valid: false, error: 'Membro nao encontrado neste grupo' }
+  }
+
   // 3. Buscar jogador para obter team_id
   const { data: player, error: playerError } = await admin
     .from('players')
@@ -47,6 +58,17 @@ export async function validatePlayerSelection(
 
   // 4. Regra "um por seleção": verificar se member já tem outro jogador da mesma seleção
   // ⚠️ CRÍTICO: Fazer join com players para comparar team_id
+  const { data: groupPlayer } = await admin
+    .from('team_players')
+    .select('id, group_members!inner(group_id)')
+    .eq('player_id', playerId)
+    .eq('group_members.group_id', groupId)
+    .maybeSingle()
+
+  if (groupPlayer) {
+    return { valid: false, error: 'Este jogador ja foi escolhido neste grupo' }
+  }
+
   const { data: memberPlayers } = await admin
     .from('team_players')
     .select(
@@ -174,10 +196,11 @@ export async function getSlotsCounts(memberId: string): Promise<{
 export async function getAvailablePlayers(groupId: string, query?: string) {
   const admin = supabaseAdmin()
 
-  // Pegar todos os player_ids já atribuídos no grupo
+  // Pegar player_ids já atribuídos NESTE grupo (via group_members)
   const { data: draftedPlayers } = await admin
     .from('team_players')
-    .select('player_id')
+    .select('player_id, group_members!inner(group_id)')
+    .eq('group_members.group_id', groupId)
 
   const draftedIds = draftedPlayers?.map(tp => tp.player_id) || []
 
@@ -254,16 +277,17 @@ export async function getMemberTeam(memberId: string) {
 export async function isDraftComplete(groupId: string): Promise<boolean> {
   const admin = supabaseAdmin()
 
-  // Contar membros
+  // Contar membros do grupo
   const { count: memberCount } = await admin
     .from('group_members')
     .select('id', { count: 'exact' })
     .eq('group_id', groupId)
 
-  // Contar times completos (16 jogadores por membro)
+  // Contar jogadores por membro, filtrando apenas membros DESTE grupo
   const { data: memberStats } = await admin
     .from('team_players')
-    .select('group_member_id')
+    .select('group_member_id, group_members!inner(group_id)')
+    .eq('group_members.group_id', groupId)
 
   if (!memberStats) return false
 

@@ -70,6 +70,11 @@ export default async function AdminHome() {
     )
   }
 
+  // Usuário não é admin deste grupo — redirecionar para a área de participante
+  if (!isAdmin) {
+    redirect('/app')
+  }
+
   const { data: members } = await admin
     .from('group_members')
     .select('id, display_name, role, status')

@@ -1,6 +1,7 @@
 ### 🔓 GERAR LINK DE LOGIN (Teste Auth)
 ### Use isto para conseguir acesso sem email real
-POST http://localhost:3000/api/test-auth
+GET http://localhost:3000/api/test-football?search=Korea
+
 Content-Type: application/json
 
 {
@@ -20,9 +21,26 @@ GET http://localhost:3000/app
 
 ### ─────────────────────────────────────────────────────────
 
-### 🧪 Test Football API
+### 📊 CHECK SYNC (SEM requisições — só queries no banco)
+### Use isto ANTES de rodar syncPlayers() para saber exatamente quantas requisições fará
+GET http://localhost:3000/api/sync-check
+
+### 🧪 Test Football API — Sanidade (squad Brasil)
 GET http://localhost:3000/api/test-football
+
+### 🔍 Buscar time por nome (descobre ID e nome exato da API)
+### Substitua "Korea" pelo nome que quiser testar
+GET http://localhost:3000/api/test-football?search=Korea
+
+### 🔍 Buscar squad por ID (confirma jogadores de um time)
+### Substitua 149 pelo ID que quiser conferir
+GET http://localhost:3000/api/test-football?squad=149
+
+### 🔄 SYNC OFFLINE (Completa 4 times pendentes sem gastar requests)
+POST http://localhost:3000/api/sync-offline
+Content-Type: application/json
 
 ### 🔧 Fix Schema Cache
 POST http://localhost:3000/api/fix-schema-cache
 Content-Type: application/json
+

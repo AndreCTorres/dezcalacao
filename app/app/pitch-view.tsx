@@ -25,6 +25,7 @@ export type PitchPlayer = {
 
 type PitchViewProps = {
   team: PitchPlayer[]
+  memberTeamName?: string | null
 }
 
 // Configuração do posicionamento no campo
@@ -149,7 +150,7 @@ function PlayerToken({ player, size = 'md' }: { player: PitchPlayer; size?: 'sm'
   )
 }
 
-export function PitchView({ team }: PitchViewProps) {
+export function PitchView({ team, memberTeamName }: PitchViewProps) {
   const starters = team.filter(t => t.slot === 'starter')
   const bench = team.filter(t => t.slot === 'bench')
 
@@ -187,7 +188,12 @@ export function PitchView({ team }: PitchViewProps) {
 
         {/* Cabeçalho */}
         <div className="flex justify-between items-center px-5 py-3 bg-black/40 border-b border-white/10">
-          <h2 className="text-white font-bold text-lg tracking-tight">Meu Time</h2>
+          <div>
+            <h2 className="text-white font-bold text-lg tracking-tight">Meu Time</h2>
+            {memberTeamName && (
+              <p className="text-xs text-lime-300 mt-1">🏆 {memberTeamName}</p>
+            )}
+          </div>
           <div className="flex items-center gap-3">
             {hasRatings && (
               <div className="flex items-center gap-1.5 bg-yellow-500/20 rounded-full px-3 py-1 border border-yellow-500/30">

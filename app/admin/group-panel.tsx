@@ -82,167 +82,170 @@ export function GroupPanel({ group, members, isAdmin }: GroupPanelProps) {
             </div>
           </div>
           <div className="flex flex-col gap-3 items-end">
-            {isAdmin && (
-              <Link
-                href={`/app?group=${group.id}`}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition flex items-center gap-2"
-              >
-                👁️ Ver como Participante
-              </Link>
-            )}
             <ModeSwitcher isAdmin={isAdmin} />
             <LogoutButton />
           </div>
         </div>
 
-        {/* Grid de cards principais */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
-          {/* Card: Membros */}
-          <div className="bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700/50 hover:border-gray-600/50 transition">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-lime-400">👥 Membros</h2>
-              <span className="bg-lime-400/20 text-lime-400 text-sm px-2 py-1 rounded-lg font-semibold">
-                {members.length}
-              </span>
-            </div>
-            <div className="space-y-2 max-h-80 overflow-y-auto">
-              {members.length === 0 ? (
-                <p className="text-gray-500 text-sm py-4 text-center">Nenhum membro ainda</p>
-              ) : (
-                members.map((member) => (
-                  <div
-                    key={member.id}
-                    className="flex justify-between items-center p-3 bg-gray-700/30 hover:bg-gray-700/50 rounded-lg transition border border-gray-700/30"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-white font-medium text-sm truncate">{member.display_name}</p>
-                      {member.role === 'admin' && (
-                        <p className="text-xs text-lime-400 font-semibold mt-0.5">🔑 Admin</p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 ml-2 flex-shrink-0">
-                      <span
-                        className={`text-xs px-2.5 py-1 rounded-full font-medium ${
-                          member.status === 'joined'
-                            ? 'bg-lime-400/20 text-lime-400'
-                            : 'bg-yellow-500/20 text-yellow-300'
-                        }`}
-                      >
-                        {member.status === 'joined' ? '✓ Ativo' : '⏳ Convidado'}
-                      </span>
-                      {/* Botão de visualização — sempre visível para o admin */}
-                      {isAdmin && (
-                        <Link
-                          href={`/admin/view-member/${member.id}`}
-                          className="text-xs px-2.5 py-1 rounded-full font-medium transition"
-                          style={{
-                            background: 'rgba(197,242,74,.1)',
-                            color: '#c5f24a',
-                            border: '1px solid rgba(197,242,74,.25)',
-                          }}
-                          title={`Ver visão de ${member.display_name}`}
+        {/* Grid de cards principais: esquerda (sidebar) + direita (main) */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          
+          {/* Coluna Esquerda: Membros + Adicionar */}
+          <div className="lg:col-span-1 space-y-6">
+            {/* Card: Membros */}
+            <div className="bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700/50 hover:border-gray-600/50 transition">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold text-lime-400">👥 Membros</h2>
+                <span className="bg-lime-400/20 text-lime-400 text-sm px-2 py-1 rounded-lg font-semibold">
+                  {members.length}
+                </span>
+              </div>
+              <div className="space-y-2 max-h-80 overflow-y-auto">
+                {members.length === 0 ? (
+                  <p className="text-gray-500 text-sm py-4 text-center">Nenhum membro ainda</p>
+                ) : (
+                  members.map((member) => (
+                    <div
+                      key={member.id}
+                      className="flex justify-between items-center p-3 bg-gray-700/30 hover:bg-gray-700/50 rounded-lg transition border border-gray-700/30"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white font-medium text-sm truncate">{member.display_name}</p>
+                        {member.role === 'admin' && (
+                          <p className="text-xs text-lime-400 font-semibold mt-0.5">🔑 Admin</p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 ml-2 flex-shrink-0">
+                        <span
+                          className={`text-xs px-2.5 py-1 rounded-full font-medium ${
+                            member.status === 'joined'
+                              ? 'bg-lime-400/20 text-lime-400'
+                              : 'bg-yellow-500/20 text-yellow-300'
+                          }`}
                         >
-                          👁️
-                        </Link>
-                      )}
+                          {member.status === 'joined' ? '✓ Ativo' : '⏳ Convidado'}
+                        </span>
+                        {/* Botão de visualização — sempre visível para o admin */}
+                        {isAdmin && (
+                          <Link
+                            href={`/admin/view-member/${member.id}`}
+                            className="text-xs px-2.5 py-1 rounded-full font-medium transition"
+                            style={{
+                              background: 'rgba(197,242,74,.1)',
+                              color: '#c5f24a',
+                              border: '1px solid rgba(197,242,74,.25)',
+                            }}
+                            title={`Ver visão de ${member.display_name}`}
+                          >
+                            👁️
+                          </Link>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Card: Adicionar Membro (só para admin) */}
+            {isAdmin && (
+              <div className="bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700/50 hover:border-gray-600/50 transition">
+                <h2 className="text-lg font-bold text-lime-400 mb-4">➕ Adicionar Membro</h2>
+                <div className="space-y-3">
+                  <AddMemberForm groupId={group.id} />
+                  <SeedUsersButton groupId={group.id} />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Coluna Direita: Cards de ações principais */}
+          <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            {/* Card: Sincronizar Jogadores */}
+            <div className="bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700/50 hover:border-gray-600/50 transition">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold text-lime-400">⚽ Jogadores</h2>
+                <span className="text-xl">🔄</span>
+              </div>
+              {isAdmin ? (
+                <div className="space-y-4">
+                  <p className="text-gray-400 text-sm">
+                    Sincronize os convocados da Copa 2026 antes do draft.
+                  </p>
+                  <SyncPlayersButton />
+                </div>
+              ) : (
+                <p className="text-gray-500 text-sm py-4">
+                  Apenas o admin pode sincronizar jogadores
+                </p>
               )}
             </div>
-            
-            {/* Formulário de adicionar membro (só para admin) */}
-            {isAdmin && (
-              <div className="space-y-3 mt-6 pt-6 border-t border-gray-700/50">
-                <AddMemberForm groupId={group.id} />
-                <SeedUsersButton groupId={group.id} />
-              </div>
-            )}
-          </div>
 
-          {/* Card: Sincronizar Jogadores */}
-          <div className="bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700/50 hover:border-gray-600/50 transition">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-lime-400">⚽ Jogadores</h2>
-              <span className="text-xl">🔄</span>
-            </div>
-            {isAdmin ? (
-              <div className="space-y-4">
-                <p className="text-gray-400 text-sm">
-                  Sincronize os convocados da Copa 2026 antes do draft.
-                </p>
-                <SyncPlayersButton />
+            {/* Card: Draft */}
+            <div className="bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700/50 hover:border-gray-600/50 transition">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold text-lime-400">🏆 Draft</h2>
+                <span className="text-xl">
+                  {group.status === 'setup' ? '⏳' : 
+                   group.status === 'drafting' ? '🎯' :
+                   '✅'}
+                </span>
               </div>
-            ) : (
-              <p className="text-gray-500 text-sm py-4">
-                Apenas o admin pode sincronizar jogadores
-              </p>
-            )}
-          </div>
-
-          {/* Card: Draft */}
-          <div className="bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700/50 hover:border-gray-600/50 transition">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-lime-400">🏆 Draft</h2>
-              <span className="text-xl">
-                {group.status === 'setup' ? '⏳' : 
-                 group.status === 'drafting' ? '🎯' :
-                 '✅'}
-              </span>
-            </div>
-            {group.status === 'setup' ? (
-              <div className="space-y-4">
-                <p className="text-gray-400 text-sm">
-                  O draft ainda não começou. Adicione membros primeiro.
-                </p>
-                {isAdmin && members.length > 1 && (
-                  <Link
-                    href="/admin/draft"
-                    className="block w-full py-2 px-4 bg-lime-400 hover:bg-lime-500 text-gray-900 text-center font-semibold rounded-lg transition"
-                  >
-                    ▶️ Iniciar Draft
-                  </Link>
-                )}
-                {isAdmin && members.length <= 1 && (
-                  <p className="text-xs text-gray-500 bg-gray-900/50 p-3 rounded-lg">
-                    ⚠️ Adicione pelo menos 2 membros para iniciar
+              {group.status === 'setup' ? (
+                <div className="space-y-4">
+                  <p className="text-gray-400 text-sm">
+                    O draft ainda não começou. Adicione membros primeiro.
                   </p>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <p className="text-gray-400 text-sm">
-                  Draft em andamento ou finalizado
-                </p>
-                {isAdmin && (
-                  <Link
-                    href="/admin/draft"
-                    className="block w-full py-2 px-4 bg-gray-700 hover:bg-gray-600 text-white text-center font-medium rounded-lg transition"
-                  >
-                    Ir para o Draft
-                  </Link>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Card: Rodadas */}
-          <div className="bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700/50 hover:border-gray-600/50 transition">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-lime-400">📊 Rodadas</h2>
-              <span className="text-xl">⏱️</span>
+                  {isAdmin && members.length > 1 && (
+                    <Link
+                      href="/admin/draft"
+                      className="block w-full py-2 px-4 bg-lime-400 hover:bg-lime-500 text-gray-900 text-center font-semibold rounded-lg transition"
+                    >
+                      ▶️ Iniciar Draft
+                    </Link>
+                  )}
+                  {isAdmin && members.length <= 1 && (
+                    <p className="text-xs text-gray-500 bg-gray-900/50 p-3 rounded-lg">
+                      ⚠️ Adicione pelo menos 2 membros para iniciar
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-gray-400 text-sm">
+                    Draft em andamento ou finalizado
+                  </p>
+                  {isAdmin && (
+                    <Link
+                      href="/admin/draft"
+                      className="block w-full py-2 px-4 bg-gray-700 hover:bg-gray-600 text-white text-center font-medium rounded-lg transition"
+                    >
+                      Ir para o Draft
+                    </Link>
+                  )}
+                </div>
+              )}
             </div>
-            <p className="text-gray-400 text-sm mb-4">
-              Gerencie rodadas do torneio e calcule pontuações.
-            </p>
-            {isAdmin && (
-              <Link
-                href="/admin/rodadas"
-                className="block w-full py-2 px-4 bg-gray-700 hover:bg-gray-600 text-white text-center font-medium rounded-lg transition"
-              >
-                Gerenciar Rodadas
-              </Link>
-            )}
+
+            {/* Card: Rodadas */}
+            <div className="bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700/50 hover:border-gray-600/50 transition md:col-span-2">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold text-lime-400">📊 Rodadas</h2>
+                <span className="text-xl">⏱️</span>
+              </div>
+              <p className="text-gray-400 text-sm mb-4">
+                Gerencie rodadas do torneio e calcule pontuações.
+              </p>
+              {isAdmin && (
+                <Link
+                  href="/admin/rodadas"
+                  className="block w-full py-2 px-4 bg-gray-700 hover:bg-gray-600 text-white text-center font-medium rounded-lg transition"
+                >
+                  Gerenciar Rodadas
+                </Link>
+              )}
+            </div>
           </div>
         </div>
 

@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react'
 import { getDraftState, searchPlayers, assignPlayerToMember, unassignPlayer, closeDraft } from './actions'
 import { MemberLineup } from './member-lineup'
 import { PlayerSearch } from './player-search'
+import { BulkImport } from './bulk-import'
 import type { Position } from '@/lib/types'
 
 type GroupMember = {
@@ -181,6 +182,15 @@ export function DraftInterface({ groupId, members }: Props) {
           {success}
         </div>
       )}
+
+      {/* Bulk Import */}
+      <div className="col-span-full">
+        <BulkImport
+          groupId={groupId}
+          members={draftState.members.map((m: any) => ({ id: m.memberId, display_name: m.memberName }))}
+          onSuccess={() => loadDraftState()}
+        />
+      </div>
     </div>
   )
 }

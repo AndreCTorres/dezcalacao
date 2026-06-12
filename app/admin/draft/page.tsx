@@ -5,6 +5,8 @@ import { createActionClient, supabaseAdmin } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { DraftInterface } from './draft-interface'
+import { ModeSwitcher } from '@/app/components/mode-switcher'
+import { LogoutButton } from '@/app/components/logout-button'
 
 export default async function DraftPage() {
   // Validar autenticação
@@ -39,9 +41,15 @@ export default async function DraftPage() {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <Link href="/admin" className="text-lime-400 hover:text-lime-300 text-sm mb-4 inline-block">
-            ← Voltar para admin
-          </Link>
+          <div className="flex justify-between items-start mb-4">
+            <Link href="/admin" className="text-lime-400 hover:text-lime-300 text-sm inline-block">
+              ← Voltar para admin
+            </Link>
+            <div className="flex gap-3 items-center">
+              <ModeSwitcher isAdmin={true} />
+              <LogoutButton />
+            </div>
+          </div>
           <h1 className="text-4xl font-bold text-lime-400 mb-2">
             {group.name} — Draft
           </h1>

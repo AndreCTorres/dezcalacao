@@ -207,7 +207,7 @@ export async function addMember(formData: FormData) {
 
 const API_BASE = 'https://v3.football.api-sports.io'
 const WORLD_CUP_LEAGUE_ID = 1
-const SEASON = '2026'
+const SEASON = 'WC2026'
 // Throttle para respeitar rate limit do API-Football
 // Free Plan: 10 req/min = 1 req a cada 6 segundos
 // Usando 6500ms para estar seguro (10 req em ~65s)
@@ -224,14 +224,33 @@ const WORLD_CUP_2026_COUNTRIES = [
   'Japan', 'Jordan', 'Uzbekistan', 'Qatar', 'South Korea', 'Iran', 'New Zealand',
 ]
 
+// IDs fictícios inseridos pelo sync-offline (não são IDs reais da API-Football)
+// Precisam ser ignorados no cache para forçar uma busca real
+const FAKE_IDS_FROM_OFFLINE_SYNC = new Set([2500, 2501, 2502, 2503])
+
+// IDs errados que podem ter sido salvos por busca com match incorreto
+// Ex: 657 = Beitar Jerusalem (Israel), não é a seleção dos EUA
+const WRONG_IDS_TO_IGNORE = new Set([657])
+
 // Mapeamento de nomes conhecidos da API que diferem da nossa lista
 const COUNTRY_NAME_MAPPING: Record<string, string> = {
   'South Korea': 'Korea Republic',
   'DR Congo': 'Congo DR',
   'Czechia': 'Czech Republic',
   'Turkey': 'Türkiye',
-  'Ivory Coast': 'Cote D\'Ivoire',
-  'Cape Verde': 'Cape Verde',
+  'Ivory Coast': "Cote D'Ivoire",
+  'Cape Verde': 'Cape Verde Islands',
+  'Bosnia & Herzegovina': 'Bosnia',
+  'Curaçao': 'Curacao',
+  'New Zealand': 'New Zealand',
+  'USA': 'United States',
+}
+
+// IDs conhecidos hardcoded para países que a busca por nome falha
+// Evita gastar requisições e erros de matching
+const KNOWN_TEAM_IDS: Record<string, { id: number; apiName: string }> = {
+  'South Korea': { id: 17, apiName: 'South Korea' },
+  'USA': { id: 2384, apiName: 'USA' }, // Confirmado via Copa 2022 (league=1&season=2022)
 }
 
 async function apiFootballGet(endpoint: string, params: Record<string, string | number> = {}) {
@@ -330,6 +349,17 @@ export async function syncPlayers() {
     const existingCountries = new Set<string>()
     if (existingTeams) {
       for (const team of existingTeams) {
+        // Ignorar IDs fictícios inseridos pelo sync-offline (2500–2503)
+        // Esses IDs não existem na API-Football e retornariam squad vazio
+        if (FAKE_IDS_FROM_OFFLINE_SYNC.has(team.id)) {
+          console.log(`[Sync] ⚠️ ${team.country} tem ID fictício (${team.id}), vai rebuscar`)
+          continue
+        }
+        // Ignorar IDs errados (ex: 657 = Beitar Jerusalem, não é a seleção dos EUA)
+        if (WRONG_IDS_TO_IGNORE.has(team.id)) {
+          console.log(`[Sync] ⚠️ ${team.country} tem ID errado (${team.id}), vai rebuscar`)
+          continue
+        }
         const country = team.country
         teamIdMap.set(country, { id: team.id, apiName: team.api_name })
         existingCountries.add(country)
@@ -345,6 +375,14 @@ export async function syncPlayers() {
 
     // Buscar cada seleção da lista pendente
     for (const country of pendingCountries) {
+      // Primeiro verificar se temos o ID hardcoded (evita busca e erro de matching)
+      if (KNOWN_TEAM_IDS[country]) {
+        const { id: teamId, apiName: teamName } = KNOWN_TEAM_IDS[country]
+        teamIdMap.set(country, { id: teamId, apiName: teamName })
+        console.log(`[Sync] ✓ ${country} → ID ${teamId} (${teamName}) [hardcoded]`)
+        continue
+      }
+
       const searchName = COUNTRY_NAME_MAPPING[country] || country
       console.log(`[Sync] Buscando "${searchName}"...`)
 
@@ -352,13 +390,14 @@ export async function syncPlayers() {
         await sleep(THROTTLE_DELAY_MS)
         const searchResults = await apiFootballGet('/teams', { search: searchName })
 
-        // Filtrar por seleção nacional, excluindo times femininos (W), sub-23 (U23), etc.
+        // Filtrar por seleção nacional, excluindo times femininos e sub-categorias
         const nationalTeam = searchResults.find((item: any) => {
           const isNational = item.team?.national === true
-          const teamName = item.team?.name || ''
-          // Excluir sufixos de times femininos, sub-categorias, etc.
-          const hasFeminineOrSubSuffix = / [WU]\d*$/.test(teamName) || teamName.includes(' U20') || teamName.includes(' U17')
-          return isNational && !hasFeminineOrSubSuffix
+          const teamName: string = item.team?.name || ''
+          const isSub = / [WU]\d*$/.test(teamName) ||
+            teamName.includes(' U20') || teamName.includes(' U17') ||
+            teamName.includes(' U23') || teamName.includes(' Women')
+          return isNational && !isSub
         })
 
         if (nationalTeam) {

@@ -1,4 +1,4 @@
-import { describe, it, expect } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 import {
   effectiveRating,
   basePoints,
@@ -7,6 +7,9 @@ import {
   type PlayerRating,
   type LineupSlot,
 } from '@/lib/scoring'
+
+const describe = test.describe
+const it = test
 
 /**
  * Testes Unitários: Lógica Pura de Pontuação

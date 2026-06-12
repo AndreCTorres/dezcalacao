@@ -233,10 +233,11 @@ export async function searchPlayers(query: string, groupId: string) {
     return { success: false, error: 'Você não é admin deste grupo', players: [] }
   }
 
-  // Buscar drafted players do grupo
+  // Buscar drafted players do grupo (via group_members para filtrar pelo grupo correto)
   const { data: draftedPlayers } = await admin
     .from('team_players')
-    .select('player_id')
+    .select('player_id, group_members!inner(group_id)')
+    .eq('group_members.group_id', groupId)
 
   const draftedIds = draftedPlayers?.map(tp => tp.player_id) || []
 
@@ -295,21 +296,46 @@ export async function getDraftState(groupId: string) {
     .eq('group_id', groupId)
     .order('display_name', { ascending: true })
 
-  // Buscar draft state por membro
-  const memberStates = await Promise.all(
-    (members || []).map(async member => {
-      const team = await getMemberTeam(member.id)
-      return {
-        memberId: member.id,
-        memberName: member.display_name,
-        status: member.status,
-        teamCount: team.length,
-        team,
-      }
-    })
-  )
+  // UMA única query para todos os team_players do grupo (muito mais eficiente)
+  const { data: allTeamPlayers } = await admin
+    .from('team_players')
+    .select(`
+      id,
+      player_id,
+      slot,
+      position_slot,
+      created_at,
+      group_member_id,
+      players (
+        id,
+        name,
+        team_id,
+        team_name,
+        position,
+        photo_url,
+        number
+      )
+    `)
+    .in('group_member_id', (members || []).map(m => m.id))
+    .order('slot', { ascending: false })
+    .order('position_slot', { ascending: true })
 
-  const isComplete = await isDraftComplete(groupId)
+  // Agrupar por membro em memória
+  const teamByMember: Record<string, any[]> = {}
+  for (const tp of allTeamPlayers || []) {
+    if (!teamByMember[tp.group_member_id]) teamByMember[tp.group_member_id] = []
+    teamByMember[tp.group_member_id].push(tp)
+  }
+
+  const memberStates = (members || []).map(member => ({
+    memberId: member.id,
+    memberName: member.display_name,
+    status: member.status,
+    teamCount: (teamByMember[member.id] || []).length,
+    team: teamByMember[member.id] || [],
+  }))
+
+  const isComplete = memberStates.every(m => m.teamCount === 16) && memberStates.length > 0
 
   return {
     success: true,
@@ -327,6 +353,11 @@ export async function bulkImportDraft(
   draftList: string,
   members: any[]
 ) {
+
+  // Remove acentos para busca tolerante (Mbappe → Mbappé, Gyokeres → Gyökeres)
+  function removeAccents(str: string) {
+    return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  }
   // Validar autenticação
   const supabase = createActionClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -388,10 +419,12 @@ export async function bulkImportDraft(
     for (const playerName of playerNames) {
       if (!playerName) continue
 
+      // Busca com acento e sem acento (unaccented) via extensão unaccent do Postgres
+      // Isso garante que "Mbappe" encontra "Mbappé", "Gyokeres" encontra "Gyökeres", etc.
       const { data: players } = await admin
         .from('players')
         .select('id, position')
-        .ilike('name', `%${playerName}%`)
+        .or(`name.ilike.%${playerName}%,name.ilike.%${removeAccents(playerName)}%`)
         .limit(1)
 
       if (!players || players.length === 0) {
@@ -422,6 +455,12 @@ export async function bulkImportDraft(
       const team = await getMemberTeam(member.id)
       const slot = team.length < 11 ? ('starter' as const) : ('bench' as const)
 
+      const validation = await validatePlayerSelection(groupId, member.id, player.id, positionSlot, slot)
+      if (!validation.valid) {
+        errors.push(`Erro ao adicionar ${playerName}: ${validation.error}`)
+        continue
+      }
+
       // Inserir
       const { error: insertError } = await admin
         .from('team_players')
@@ -445,9 +484,11 @@ export async function bulkImportDraft(
   revalidatePath('/admin/draft')
 
   return {
-    success: errors.length === 0,
+    success: importedCount > 0 && errors.length === 0,
     imported: importedCount,
-    errors: errors.length > 0 ? errors.slice(0, 5) : undefined,
-    error: errors.length > 0 ? `${importedCount} jogadores importados, ${errors.length} erros. ${errors[0]}` : undefined,
+    errors: errors.length > 0 ? errors.slice(0, 10) : undefined,
+    error: errors.length > 0
+      ? `${importedCount} jogadores importados. ${errors.length} erros:\n${errors.slice(0, 5).join('\n')}`
+      : undefined,
   }
 }

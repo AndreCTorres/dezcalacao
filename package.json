@@ -7,9 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "playwright test --run",
-    "test:e2e": "playwright test tests/e2e --run",
-    "test:unit": "playwright test tests/unit --run",
+    "test": "playwright test",
+    "test:e2e": "playwright test tests/e2e",
+    "test:unit": "playwright test --config=playwright.unit.config.ts",
     "test:ui": "playwright test --ui",
     "test:debug": "playwright test --debug"
   },

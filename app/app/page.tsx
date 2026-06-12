@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { LogoutButton } from '@/app/components/logout-button'
 import { ModeSwitcher } from '@/app/components/mode-switcher'
+import { ProfileEditButton } from './profile-edit-button'
 import { PitchView, type PitchPlayer } from './pitch-view'
 import { ParticipantStandings } from './participant-standings'
 import { RoundDetails } from './round-details'
@@ -28,6 +29,7 @@ export default async function AppPage() {
       id,
       group_id,
       display_name,
+      team_name,
       groups (
         id,
         name,
@@ -163,10 +165,22 @@ export default async function AppPage() {
         </div>
 
         {/* Bem-vindo */}
-        <div className="mb-8 p-4 bg-gray-800/30 backdrop-blur rounded-lg border border-gray-700/50">
-          <p className="text-gray-300 text-sm">
-            👋 Bem-vindo, <span className="text-lime-400 font-semibold">{membership.display_name}</span>
-          </p>
+        <div className="mb-8 p-4 bg-gray-800/30 backdrop-blur rounded-lg border border-gray-700/50 flex justify-between items-center">
+          <div>
+            <p className="text-gray-300 text-sm">
+              👋 Bem-vindo, <span className="text-lime-400 font-semibold">{membership.display_name}</span>
+            </p>
+            {membership.team_name && (
+              <p className="text-gray-400 text-xs mt-1">
+                🏆 Seu time: <span className="text-lime-300">{membership.team_name}</span>
+              </p>
+            )}
+          </div>
+          <ProfileEditButton
+            memberId={groupMemberId}
+            currentDisplayName={membership.display_name}
+            currentTeamName={membership.team_name}
+          />
         </div>
 
         {/* Grid principal */}
@@ -174,7 +188,7 @@ export default async function AppPage() {
 
           {/* Campinho — ocupa 2 colunas no desktop */}
           <div className="lg:col-span-2">
-            <PitchView team={teamWithRatings} />
+            <PitchView team={teamWithRatings} memberTeamName={membership.team_name} />
           </div>
 
           {/* Ranking */}

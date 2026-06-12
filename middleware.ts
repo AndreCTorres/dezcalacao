@@ -46,41 +46,13 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(redirectUrl)
   }
 
-  // Se está logado e tenta acessar /login
+  // Se está logado e tenta acessar /login, redirecionar para /app
+  // (página /app ou /admin farão a verificação de role apropriada)
   if (user && request.nextUrl.pathname === '/login') {
-    console.log('[Middleware] ✓ Já autenticado - verificando role...')
-    
-    // Verificar se é admin de algum grupo
-    const { data: adminGroups } = await supabase
-      .from('groups')
-      .select('id')
-      .eq('admin_id', user.id)
-      .limit(1)
-
-    const isAdmin = adminGroups && adminGroups.length > 0
-
+    console.log('[Middleware] ✓ Já autenticado - redirecionando para /app')
     const redirectUrl = request.nextUrl.clone()
-    redirectUrl.pathname = isAdmin ? '/admin' : '/app'
-    console.log(`[Middleware] Redirecionando para ${isAdmin ? '/admin' : '/app'}`)
+    redirectUrl.pathname = '/app'
     return NextResponse.redirect(redirectUrl)
-  }
-
-  // Se está tentando acessar /admin mas não é admin
-  if (user && request.nextUrl.pathname.startsWith('/admin')) {
-    const { data: adminGroups } = await supabase
-      .from('groups')
-      .select('id')
-      .eq('admin_id', user.id)
-      .limit(1)
-
-    const isAdmin = adminGroups && adminGroups.length > 0
-
-    if (!isAdmin) {
-      console.log('[Middleware] ✗ Não é admin - redirecionando para /app')
-      const redirectUrl = request.nextUrl.clone()
-      redirectUrl.pathname = '/app'
-      return NextResponse.redirect(redirectUrl)
-    }
   }
 
   console.log('[Middleware] ✓ Permitindo acesso')

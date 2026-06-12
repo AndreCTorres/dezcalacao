@@ -26,6 +26,16 @@ Leia primeiro:
 
 ## ⚠️ Regras Inegociáveis
 
+### 🚨 Economia de Requisições à API-Football
+- **Limite diário real: ~100 req/dia** no plano free. Cada requisição conta.
+- ✅ Jogadores das 48 seleções já estão sincronizados no banco (`season = 'WC2026'`). **NÃO rodar syncPlayers() novamente** — os dados estão completos.
+- ✅ As próximas requisições devem ser **exclusivamente para coleta de notas** (ratings por fixture/rodada).
+- ❌ Nunca rodar sync de elencos novamente sem motivo explícito e aprovação do admin.
+- ❌ Nunca fazer chamadas exploratórias/diagnóstico à API-Football sem necessidade real.
+- ✅ Usar `/api/sync-check` (zero requisições) para verificar estado antes de qualquer sync.
+- ✅ IDs de times já resolvidos e hardcoded em `KNOWN_TEAM_IDS` — não rebuscar.
+- ✅ Ao fechar rodadas, usar throttle de 6500ms entre requisições para não estourar o rate limit.
+
 ### Segurança
 - ✅ Chaves de API (`API_FOOTBALL_KEY`, `SUPABASE_SERVICE_ROLE_KEY`) **NUNCA** vão pro cliente
 - ✅ Toda chamada à API-Football acontece em **API routes** ou **Server Actions** (servidor)

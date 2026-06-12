@@ -4,6 +4,8 @@
 
 import { NextResponse } from 'next/server'
 
+export const dynamic = 'force-dynamic'
+
 const BASE_URL = 'https://v3.football.api-sports.io'
 
 async function apiFootballGet(endpoint: string, params: Record<string, string | number> = {}) {

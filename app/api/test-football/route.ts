@@ -1,151 +1,188 @@
 // app/api/test-football/route.ts
-// TESTE DE SANIDADE: Confirma se /players/squads já retorna convocados de 2026
-// APENAS PARA DESENVOLVIMENTO - remover antes de produção.
+// Utilitário de consulta à API-Football para diagnóstico.
+// APENAS PARA DESENVOLVIMENTO.
+//
+// GET /api/test-football                    → squad do Brasil (sanidade)
+// GET /api/test-football?search=Korea       → busca time por nome
+// GET /api/test-football?squad=149          → squad de um time por ID
+// GET /api/test-football?wc=1              → lista os 48 times da Copa 2026 com IDs reais
 
 import { NextResponse } from 'next/server'
+
+export const dynamic = 'force-dynamic'
 
 const BASE_URL = 'https://v3.football.api-sports.io'
 
 async function apiFootballGet(endpoint: string, params: Record<string, string | number> = {}) {
   const apiKey = process.env.API_FOOTBALL_KEY
-
-  if (!apiKey) {
-    throw new Error('API_FOOTBALL_KEY não está configurada no .env.local')
-  }
+  if (!apiKey) throw new Error('API_FOOTBALL_KEY não está configurada no .env.local')
 
   const url = new URL(`${BASE_URL}${endpoint}`)
-  Object.entries(params).forEach(([key, value]) => {
-    url.searchParams.set(key, String(value))
-  })
+  Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, String(value)))
 
-  console.log('[Test API] Chamando:', url.toString())
+  console.log('[Test API] →', url.toString())
 
   const response = await fetch(url.toString(), {
-    headers: {
-      'x-apisports-key': apiKey,
-    },
+    headers: { 'x-apisports-key': apiKey },
     cache: 'no-store',
   })
 
-  if (!response.ok) {
-    const text = await response.text()
-    throw new Error(`API-Football erro ${response.status}: ${text}`)
-  }
-
+  if (!response.ok) throw new Error(`API-Football erro ${response.status}`)
   const json = await response.json()
-  console.log('[Test API] Resposta completa:', JSON.stringify(json, null, 2))
   return json
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url)
+  const searchQuery = searchParams.get('search')
+  const squadId = searchParams.get('squad')
+
   try {
-    console.log('\n========================================')
-    console.log('[Test API] TESTE DE SANIDADE: SQUAD BRASIL 2026')
-    console.log('========================================\n')
+    // ── Modo 0: lista times da Copa do Mundo 2026 ────────────────────
+    // GET /api/test-football?wc=1
+    // Usa o endpoint /teams com league=1 (Copa do Mundo) e season=2026
+    // Retorna os IDs reais de todos os participantes — incluindo EUA
+    if (searchParams.get('wc')) {
+      // Plano free só tem acesso até 2024 — usamos Copa 2022 para pegar IDs das seleções
+      // Os IDs das seleções são permanentes na API, não mudam por edição da Copa
+      console.log('[Test API] Buscando times da Copa do Mundo 2022 (league=1, season=2022) para obter IDs')
+      const json = await apiFootballGet('/teams', { league: 1, season: 2022 })
+      console.log('[Test API] Raw WC response:', JSON.stringify(json).slice(0, 300))
+      const results = (json.response || []).map((item: any) => ({
+        id: item.team?.id,
+        name: item.team?.name,
+        country: item.team?.country,
+        national: item.team?.national,
+      })).sort((a: any, b: any) => a.name.localeCompare(b.name))
 
-    const results: any = {
-      success: true,
-      test: 'Verificar se /players/squads retorna convocados de 2026',
-      brazilTeamId: 6,
+      return NextResponse.json({
+        success: true,
+        count: results.length,
+        results,
+        tip: 'Esses são os IDs reais dos times na Copa 2026. Use para atualizar KNOWN_TEAM_IDS.',
+      })
     }
 
-    // ========================================
-    // TESTE: Squad do Brasil (team_id = 6)
-    // ========================================
-    console.log('[Test API] Buscando squad do Brasil (ID: 6)...')
-    
-    const squadData = await apiFootballGet('/players/squads', { team: 6 })
-    const squads = squadData.response || []
+    // ── Modo 0b: busca times por país ────────────────────────────────
+    // GET /api/test-football?country=USA
+    // Usa o endpoint /teams filtrando pelo campo country — mais preciso que search
+    const countryParam = searchParams.get('country')
+    if (countryParam) {
+      console.log(`[Test API] Buscando seleções do país: "${countryParam}"`)
+      const json = await apiFootballGet('/teams', { country: countryParam })
+      const all = (json.response || []).map((item: any) => ({
+        id: item.team?.id,
+        name: item.team?.name,
+        country: item.team?.country,
+        national: item.team?.national,
+      }))
+      // Destacar as nacionais no topo
+      const nationals = all.filter((t: any) => t.national)
+      const others = all.filter((t: any) => !t.national)
 
-    if (squads.length === 0) {
-      throw new Error('Nenhum squad retornado para o Brasil')
+      return NextResponse.json({
+        success: true,
+        countryQueried: countryParam,
+        totalResults: all.length,
+        nationals,          // ← seleções nacionais (é aqui que está o time principal)
+        others: others.slice(0, 5), // primeiros 5 clubes só pra confirmar contexto
+        rawCount: json.results,
+        tip: 'Veja "nationals" para encontrar a seleção principal. Use ?squad=ID para confirmar o elenco.',
+      })
     }
 
+    // ── Modo 0c: listar países disponíveis na API ────────────────────
+    // GET /api/test-football?countries=1
+    const countriesParam = searchParams.get('countries')
+    if (countriesParam) {
+      console.log('[Test API] Buscando lista de países')
+      const json = await apiFootballGet('/countries')
+      const results = (json.response || []).map((item: any) => ({
+        name: item.name,
+        code: item.code,
+        flag: item.flag,
+      }))
+      // Filtrar para mostrar apenas países CONCACAF relevantes + qualquer coisa com "United"
+      const relevant = results.filter((c: any) =>
+        ['USA', 'US', 'United States', 'America'].some(k =>
+          c.name?.toLowerCase().includes(k.toLowerCase()) ||
+          c.code?.toLowerCase().includes(k.toLowerCase())
+        )
+      )
+      return NextResponse.json({
+        success: true,
+        totalCountries: results.length,
+        usaRelated: relevant,
+        // Primeiros 20 países para referência
+        sample: results.slice(0, 20),
+        tip: 'Use o "name" ou "code" exato em ?country=NOME para buscar os times',
+      })
+    }
+    if (searchQuery) {
+      console.log(`[Test API] Buscando time: "${searchQuery}"`)
+      const json = await apiFootballGet('/teams', { search: searchQuery })
+      const results = (json.response || []).map((item: any) => ({
+        id: item.team?.id,
+        name: item.team?.name,
+        country: item.team?.country,
+        national: item.team?.national,
+        logo: item.team?.logo,
+      }))
+
+      return NextResponse.json({
+        success: true,
+        query: searchQuery,
+        count: results.length,
+        results,
+        tip: 'Use ?squad=ID para ver o elenco de um time específico',
+      })
+    }
+
+    // ── Modo 2: squad de um time por ID ─────────────────────────────
+    if (squadId) {
+      console.log(`[Test API] Buscando squad do time ID: ${squadId}`)
+      const json = await apiFootballGet('/players/squads', { team: squadId })
+      const squads = json.response || []
+
+      if (!squads.length) {
+        return NextResponse.json({ success: false, error: `Nenhum squad para team_id ${squadId}` })
+      }
+
+      const squad = squads[0]
+      const players = (squad.players || []).map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        position: p.position,
+        age: p.age,
+        number: p.number,
+      }))
+
+      return NextResponse.json({
+        success: true,
+        team: { id: squad.team?.id, name: squad.team?.name },
+        playersCount: players.length,
+        players,
+      })
+    }
+
+    // ── Modo 3 (default): sanidade squad Brasil ──────────────────────
+    console.log('[Test API] Squad Brasil (sanidade)')
+    const json = await apiFootballGet('/players/squads', { team: 6 })
+    const squads = json.response || []
     const squad = squads[0]
-    const players = squad.players || []
+    const players = (squad?.players || []).map((p: any) => ({
+      id: p.id, name: p.name, position: p.position, age: p.age,
+    }))
 
-    console.log('[Test API] Time:', squad.team?.name)
-    console.log('[Test API] Total de jogadores:', players.length)
-
-    // Jogadores que confirmam 2026 (não estavam em 2022 ou são muito jovens)
-    const expectedPlayers2026 = ['Endrick', 'Vini', 'Vinicius', 'Rodrygo', 'Savinho']
-    const playersFound2026: any[] = []
-    const allPlayers: any[] = []
-
-    console.log('\n[Test API] === LISTAGEM COMPLETA ===')
-    players.forEach((player: any, idx: number) => {
-      const playerInfo = {
-        id: player.id,
-        name: player.name,
-        position: player.position,
-        age: player.age,
-        number: player.number,
-      }
-
-      allPlayers.push(playerInfo)
-
-      console.log(`${idx + 1}. ${player.name} - ${player.position} (Idade: ${player.age}, ID: ${player.id})`)
-
-      // Verificar se é um jogador característico de 2026
-      if (expectedPlayers2026.some(name => player.name.includes(name))) {
-        playersFound2026.push(playerInfo)
-      }
+    return NextResponse.json({
+      success: true,
+      team: { id: squad?.team?.id, name: squad?.team?.name },
+      playersCount: players.length,
+      players,
+      tip: 'Use ?search=NomePais para buscar um time, ou ?squad=ID para ver elenco',
     })
 
-    // Análise
-    console.log('\n[Test API] === ANÁLISE ===')
-    console.log('[Test API] Jogadores encontrados:', players.length)
-    console.log('[Test API] Jogadores característicos de 2026:', playersFound2026.length)
-
-    if (playersFound2026.length > 0) {
-      console.log('\n[Test API] ✓ CONFIRMADO: Squad é de 2026!')
-      console.log('[Test API] Jogadores identificados:')
-      playersFound2026.forEach(p => {
-        console.log(`  - ${p.name} (${p.position}, ${p.age} anos)`)
-      })
-    } else {
-      console.log('\n[Test API] ⚠️ ATENÇÃO: Não encontrei jogadores característicos de 2026')
-      console.log('[Test API] Pode ser squad antigo ou nomes diferentes')
-    }
-
-    // Verificar goleiros e atacantes famosos
-    const goalkeepers = players.filter((p: any) => p.position === 'Goalkeeper')
-    const attackers = players.filter((p: any) => p.position === 'Attacker')
-
-    console.log('\n[Test API] === POSIÇÕES ===')
-    console.log('[Test API] Goleiros:', goalkeepers.length)
-    goalkeepers.forEach((p: any) => console.log(`  - ${p.name} (${p.age} anos)`))
-    
-    console.log('[Test API] Atacantes:', attackers.length)
-    attackers.forEach((p: any) => console.log(`  - ${p.name} (${p.age} anos)`))
-
-    results.squad = {
-      team: {
-        id: squad.team?.id,
-        name: squad.team?.name,
-      },
-      playersCount: players.length,
-      playersFound2026,
-      allPlayers,
-      conclusion: playersFound2026.length > 0 
-        ? '✓ SQUAD DE 2026 CONFIRMADO' 
-        : '⚠️ Verificar manualmente se é 2026',
-    }
-
-    console.log('\n========================================')
-    console.log('[Test API] CONCLUSÃO:', results.squad.conclusion)
-    console.log('========================================\n')
-
-    return NextResponse.json(results, { status: 200 })
   } catch (error: any) {
-    console.error('\n[Test API] ❌ ERRO:', error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: error.message,
-        stack: error.stack,
-      },
-      { status: 500 }
-    )
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   }
 }

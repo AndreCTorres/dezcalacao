@@ -96,7 +96,7 @@ Membro 2: Vinícius, Foden, Benzema, Van Dijk, Courtois, Gavi, Pedri, Benzema, G
 
         {/* Erros */}
         {error && (
-          <div className="p-3 rounded-lg bg-red-500/10 text-red-400 border border-red-400/20 text-sm">
+          <div className="p-3 rounded-lg bg-red-500/10 text-red-400 border border-red-400/20 text-sm whitespace-pre-wrap">
             {error}
           </div>
         )}

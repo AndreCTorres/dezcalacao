@@ -5,7 +5,7 @@
 
 const API_BASE = 'https://v3.football.api-sports.io'
 const WORLD_CUP_LEAGUE_ID = 1
-const SEASON = '2026'
+const SEASON = 'WC2026'
 
 export interface SyncResult {
   success: boolean
