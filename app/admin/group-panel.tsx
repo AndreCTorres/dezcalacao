@@ -6,6 +6,7 @@ import { ModeSwitcher } from '../components/mode-switcher'
 import { AddMemberForm } from './add-member-form'
 import { SyncPlayersButton } from './sync-players-button'
 import { SeedUsersButton } from './seed-users-button'
+import { LinkMemberForm } from './link-member-form'
 import Link from 'next/link'
 
 type Group = {
@@ -139,6 +140,10 @@ export function GroupPanel({ group, members, isAdmin }: GroupPanelProps) {
                           >
                             👁️
                           </Link>
+                        )}
+                        {/* Botão de vincular — para membros convidados sem conta */}
+                        {isAdmin && member.status === 'invited' && !member.profile_id && (
+                          <LinkMemberForm memberId={member.id} memberName={member.display_name} />
                         )}
                       </div>
                     </div>

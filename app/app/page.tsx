@@ -21,8 +21,12 @@ export default async function AppPage() {
 
   const admin = supabaseAdmin()
 
-  // Buscar grupo do participante
-  const { data: membership } = await admin
+  // Garantir que o profile existe (pode não ter sido criado pelo trigger)
+  const displayName = user.user_metadata?.display_name || user.email?.split('@')[0] || 'Participante'
+  await admin.from('profiles').upsert({ id: user.id, display_name: displayName }, { onConflict: 'id' })
+
+  // Buscar grupo do participante (já vinculado)
+  let { data: membership } = await admin
     .from('group_members')
     .select(
       `
@@ -42,6 +46,63 @@ export default async function AppPage() {
     .eq('profile_id', user.id)
     .eq('status', 'joined')
     .single()
+
+  // Se não encontrou membership ativa, verificar se existe convite pendente pelo e-mail
+  if (!membership && user.email) {
+    const { data: pendingInvite } = await admin
+      .from('group_members')
+      .select(
+        `
+        id,
+        group_id,
+        display_name,
+        team_name,
+        groups (
+          id,
+          name,
+          status,
+          season,
+          admin_id
+        )
+      `
+      )
+      .eq('invite_email', user.email)
+      .eq('status', 'invited')
+      .single()
+
+    if (pendingInvite) {
+      // Aceitar convite automaticamente: linkar profile_id e marcar como joined
+      const { data: updatedMember } = await admin
+        .from('group_members')
+        .update({
+          profile_id: user.id,
+          status: 'joined',
+          joined_at: new Date().toISOString(),
+        })
+        .eq('id', pendingInvite.id)
+        .select(
+          `
+          id,
+          group_id,
+          display_name,
+          team_name,
+          groups (
+            id,
+            name,
+            status,
+            season,
+            admin_id
+          )
+        `
+        )
+        .single()
+
+      if (updatedMember) {
+        membership = updatedMember
+        console.log('[AppPage] ✓ Convite aceito automaticamente para:', user.email)
+      }
+    }
+  }
 
   if (!membership || !membership.groups) {
     return (

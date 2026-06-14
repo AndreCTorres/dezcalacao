@@ -201,6 +201,81 @@ export async function addMember(formData: FormData) {
   }
 }
 
+export async function linkMemberToEmail(formData: FormData) {
+  const memberId = formData.get('memberId') as string
+  const email = formData.get('email') as string
+
+  if (!memberId || !email || email.trim().length === 0) {
+    return { error: 'ID do membro e e-mail são obrigatórios', success: false }
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  if (!emailRegex.test(email.trim())) {
+    return { error: 'E-mail inválido', success: false }
+  }
+
+  const supabase = createActionClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) {
+    return { error: 'Você precisa estar logado', success: false }
+  }
+
+  const admin = supabaseAdmin()
+
+  // Buscar o membro e verificar que o usuário logado é admin do grupo
+  const { data: member } = await admin
+    .from('group_members')
+    .select('id, group_id, display_name, status, profile_id, groups!inner(admin_id)')
+    .eq('id', memberId)
+    .single()
+
+  if (!member) {
+    return { error: 'Membro não encontrado', success: false }
+  }
+
+  const groupAdminId = (member.groups as any)?.admin_id
+  if (groupAdminId !== user.id) {
+    return { error: 'Apenas o admin do grupo pode fazer isso', success: false }
+  }
+
+  if (member.profile_id) {
+    return { error: 'Este membro já está vinculado a uma conta', success: false }
+  }
+
+  // Buscar o usuário pelo e-mail no Auth
+  const { data: userList } = await admin.auth.admin.listUsers()
+  const targetUser = userList?.users?.find(u => u.email?.toLowerCase() === email.trim().toLowerCase())
+
+  if (!targetUser) {
+    return { error: `Nenhuma conta encontrada com o e-mail "${email.trim()}". O usuário precisa ter feito login pelo menos uma vez.`, success: false }
+  }
+
+  // Garantir que o profile existe
+  const displayNameFallback = targetUser.user_metadata?.display_name || email.split('@')[0]
+  await admin.from('profiles').upsert({ id: targetUser.id, display_name: displayNameFallback }, { onConflict: 'id' })
+
+  // Vincular profile_id e ativar o membro
+  const { error: updateError } = await admin
+    .from('group_members')
+    .update({
+      profile_id: targetUser.id,
+      invite_email: email.trim(),
+      status: 'joined',
+      joined_at: new Date().toISOString(),
+    })
+    .eq('id', memberId)
+
+  if (updateError) {
+    console.error('[linkMember] Erro ao vincular:', updateError)
+    return { error: `Erro ao vincular: ${updateError.message}`, success: false }
+  }
+
+  console.log(`[linkMember] ✓ Membro "${member.display_name}" vinculado a ${email}`)
+  revalidatePath('/admin')
+
+  return { success: true, message: `✅ ${member.display_name} vinculado a ${email.trim()} com sucesso!` }
+}
+
 // ========================================
 // SYNC API-FOOTBALL
 // ========================================
