@@ -240,9 +240,9 @@ export function GroupPanel({ group, members, isAdmin }: GroupPanelProps) {
               {isAdmin && (
                 <Link
                   href="/admin/rodadas"
-                  className="block w-full py-2 px-4 bg-gray-700 hover:bg-gray-600 text-white text-center font-medium rounded-lg transition"
+                  className="block w-full py-2 px-4 bg-lime-400 hover:bg-lime-500 text-gray-900 text-center font-semibold rounded-lg transition"
                 >
-                  Gerenciar Rodadas
+                  📊 Gerenciar Rodadas
                 </Link>
               )}
             </div>

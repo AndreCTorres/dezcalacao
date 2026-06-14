@@ -38,6 +38,24 @@ export async function GET(request: Request) {
   const squadId = searchParams.get('squad')
 
   try {
+    // ── Modo diagnóstico de fixtures ────────────────────────────────
+    // GET /api/test-football?fixtures_diag=1
+    // Testa qual season/league retorna fixtures, sem gastar muitas req
+    if (searchParams.get('fixtures_diag')) {
+      const results: any = {}
+
+      // Testa season=2026 (Copa 2026)
+      try {
+        const r26 = await apiFootballGet('/fixtures', { league: 1, season: 2026 })
+        results.wc2026 = { count: (r26.response || []).length, errors: r26.errors, firstRound: r26.response?.[0]?.league?.round }
+      } catch (e: any) { results.wc2026 = { error: e.message } }
+
+      return NextResponse.json({
+        tip: 'Se wc2026.count = 0, a API ainda não tem os fixtures da Copa 2026 disponíveis.',
+        results,
+      })
+    }
+
     // ── Modo 0: lista times da Copa do Mundo 2026 ────────────────────
     // GET /api/test-football?wc=1
     // Usa o endpoint /teams com league=1 (Copa do Mundo) e season=2026

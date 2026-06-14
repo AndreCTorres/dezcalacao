@@ -14,7 +14,7 @@ export default async function ViewMemberPage({
 }: {
   params: { memberId: string }
 }) {
-  const supabase = createActionClient()
+  const supabase = await createActionClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) redirect('/login')

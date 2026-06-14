@@ -32,7 +32,7 @@ export async function applySubstitution(
   inPlayerId: number,
   positionSlot: string
 ) {
-  const supabase = createActionClient()
+  const supabase = await createActionClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
 
   if (authError || !user) {
@@ -160,7 +160,7 @@ export async function applySubstitution(
 }
 
 export async function removeSubstitution(substitutionId: string, groupMemberId: string) {
-  const supabase = createActionClient()
+  const supabase = await createActionClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
 
   if (authError || !user) {

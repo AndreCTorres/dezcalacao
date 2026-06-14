@@ -9,7 +9,7 @@ import { getFixtures, getPlayerStats } from '@/lib/apiFootball'
 import { calculateRoundScores } from '@/lib/services/scoring.service'
 
 export async function createRound(groupId: string, name: string, startsAt?: string) {
-  const supabase = createActionClient()
+  const supabase = await createActionClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
 
   if (authError || !user) {
@@ -53,7 +53,7 @@ export async function createRound(groupId: string, name: string, startsAt?: stri
 }
 
 export async function closeRound(groupId: string, roundId: string) {
-  const supabase = createActionClient()
+  const supabase = await createActionClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
 
   if (authError || !user) {
@@ -234,4 +234,107 @@ export async function getRoundsForGroup(groupId: string) {
   }
 
   return { success: true, rounds: rounds || [] }
+}
+
+/**
+ * Reset do draft após os 16avos de final.
+ * - Deleta todos os team_players e substitutions do grupo
+ * - Preserva round_scores (pontuações históricas ficam intactas)
+ * - Muda status do grupo para 'drafting' para permitir novo draft
+ * - NÃO deleta rodadas nem scores
+ */
+export async function resetDraftForNewPhase(groupId: string) {
+  const supabase = await createActionClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    return { success: false, error: 'Não autenticado' }
+  }
+
+  const admin = supabaseAdmin()
+
+  // Verificar que é admin do grupo
+  const { data: group } = await admin
+    .from('groups')
+    .select('id, name, status')
+    .eq('id', groupId)
+    .eq('admin_id', user.id)
+    .single()
+
+  if (!group) {
+    return { success: false, error: 'Você não é admin deste grupo' }
+  }
+
+  try {
+    console.log(`[DraftReset] Iniciando reset do draft para grupo: ${group.name}`)
+
+    // 1. Buscar todos os membros do grupo
+    const { data: members } = await admin
+      .from('group_members')
+      .select('id')
+      .eq('group_id', groupId)
+
+    if (!members || members.length === 0) {
+      return { success: false, error: 'Nenhum membro encontrado' }
+    }
+
+    const memberIds = members.map(m => m.id)
+
+    // 2. Deletar post_round_swaps (trocas pós-rodada — fase nova começa do zero)
+    const { error: postSwapsError } = await admin
+      .from('post_round_swaps')
+      .delete()
+      .in('group_member_id', memberIds)
+
+    if (postSwapsError) {
+      console.error('[DraftReset] Erro ao deletar post_round_swaps:', postSwapsError)
+      return { success: false, error: `Erro ao limpar trocas pós-rodada: ${postSwapsError.message}` }
+    }
+
+    // 3. Deletar substitutions (substituições pré-rodada)
+    const { error: subsError } = await admin
+      .from('substitutions')
+      .delete()
+      .in('group_member_id', memberIds)
+
+    if (subsError) {
+      console.error('[DraftReset] Erro ao deletar substitutions:', subsError)
+      return { success: false, error: `Erro ao limpar substituições: ${subsError.message}` }
+    }
+
+    // 4. Deletar team_players (elencos do draft anterior)
+    const { error: teamPlayersError } = await admin
+      .from('team_players')
+      .delete()
+      .in('group_member_id', memberIds)
+
+    if (teamPlayersError) {
+      console.error('[DraftReset] Erro ao deletar team_players:', teamPlayersError)
+      return { success: false, error: `Erro ao limpar times: ${teamPlayersError.message}` }
+    }
+
+    // 5. Atualizar status do grupo para 'drafting'
+    const { error: groupUpdateError } = await admin
+      .from('groups')
+      .update({ status: 'drafting' })
+      .eq('id', groupId)
+
+    if (groupUpdateError) {
+      console.error('[DraftReset] Erro ao atualizar status do grupo:', groupUpdateError)
+      return { success: false, error: `Erro ao atualizar grupo: ${groupUpdateError.message}` }
+    }
+
+    console.log(`[DraftReset] ✅ Draft resetado. ${memberIds.length} membros, scores preservados.`)
+    revalidatePath('/admin')
+    revalidatePath('/admin/rodadas')
+    revalidatePath('/app')
+
+    return {
+      success: true,
+      message: `✅ Draft resetado! Times apagados para ${memberIds.length} participantes. Scores anteriores preservados. Novo draft pode começar.`,
+    }
+  } catch (error: any) {
+    console.error('[DraftReset] Erro geral:', error.message)
+    return { success: false, error: `Erro ao resetar draft: ${error.message}` }
+  }
 }

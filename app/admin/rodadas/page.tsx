@@ -6,11 +6,12 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { RoundForm } from './round-form'
 import { RoundList } from './round-list'
+import { ResetDraftButton } from './reset-draft-button'
 import { ModeSwitcher } from '@/app/components/mode-switcher'
 import { LogoutButton } from '@/app/components/logout-button'
 
 export default async function RoundsPage() {
-  const supabase = createActionClient()
+  const supabase = await createActionClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
@@ -32,7 +33,7 @@ export default async function RoundsPage() {
   // Buscar rodadas
   const { data: rounds } = await admin
     .from('rounds')
-    .select('id, name, status, starts_at, locked_at, created_at')
+    .select('id, name, status, starts_at, locked_at, ends_at, fixtures_done, fixtures_total, auto_close, created_at')
     .eq('group_id', group.id)
     .order('created_at', { ascending: false })
 
@@ -61,8 +62,9 @@ export default async function RoundsPage() {
         {/* Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Criar rodada */}
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-1 space-y-6">
             <RoundForm groupId={group.id} />
+            <ResetDraftButton groupId={group.id} />
           </div>
 
           {/* Lista de rodadas */}
@@ -81,6 +83,7 @@ export default async function RoundsPage() {
             <li>Quando os jogos terminarem, clique "Fechar Rodada"</li>
             <li>O sistema busca as notas dos jogadores e calcula pontos</li>
             <li>Participantes veem a pontuação em seu painel</li>
+            <li>Após os 16avos, use "Resetar Draft" para a nova fase</li>
           </ol>
         </div>
       </div>

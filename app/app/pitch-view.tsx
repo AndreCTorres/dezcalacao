@@ -28,16 +28,6 @@ type PitchViewProps = {
   memberTeamName?: string | null
 }
 
-// Configuração do posicionamento no campo
-// Cada posição tem uma "linha" (row) e uma ordem dentro dela
-const FORMATION_CONFIG: Record<string, { row: number; order: number; label: string }> = {
-  GK:  { row: 0, order: 0, label: 'GOL' },
-  ZAG: { row: 1, order: 0, label: 'ZAG' },
-  LAT: { row: 2, order: 0, label: 'LAT' },
-  MEI: { row: 3, order: 0, label: 'MEI' },
-  ATK: { row: 4, order: 0, label: 'ATK' },
-}
-
 // Cores por posição
 const POSITION_COLORS: Record<string, string> = {
   GK:  'from-yellow-500 to-yellow-600',
@@ -75,7 +65,6 @@ function getRatingBg(rating: number | null | undefined): string {
 function shortName(fullName: string): string {
   const parts = fullName.trim().split(' ')
   if (parts.length === 1) return fullName
-  // Prefere último nome, mas se for muito curto pega penúltimo
   const last = parts[parts.length - 1]
   if (last.length <= 3 && parts.length >= 2) {
     return parts[parts.length - 2]
@@ -89,32 +78,34 @@ function PlayerToken({ player, size = 'md' }: { player: PitchPlayer; size?: 'sm'
   const badgeColor = POSITION_BADGE_COLORS[pos] || 'bg-gray-500 text-white'
   const rating = player.rating
   const isSmall = size === 'sm'
+  const hasPhoto = !!player.players.photo_url
 
   return (
-    <div className={`flex flex-col items-center gap-1 group ${isSmall ? 'w-14' : 'w-16 sm:w-[72px]'}`}>
+    <div className={`flex flex-col items-center gap-1 ${isSmall ? 'w-14' : 'w-[68px]'}`}>
       {/* Foto / avatar */}
-      <div className={`relative ${isSmall ? 'w-12 h-12' : 'w-14 h-14 sm:w-16 sm:h-16'}`}>
-        {/* Ring de rating */}
-        <div className={`absolute inset-0 rounded-full ${getRatingBg(rating)}`} />
+      <div className={`relative ${isSmall ? 'w-11 h-11' : 'w-14 h-14'}`}>
+        {/* Ring de rating — só aparece quando tem nota */}
+        {rating != null && (
+          <div className={`absolute inset-0 rounded-full ${getRatingBg(rating)} pointer-events-none`} />
+        )}
 
         <div className={`
           w-full h-full rounded-full overflow-hidden border-2
-          bg-gradient-to-b ${colorGrad}
+          ${hasPhoto ? 'bg-gray-800' : `bg-gradient-to-b ${colorGrad}`}
           flex items-center justify-center
           border-gray-900
-          transition-transform group-hover:scale-105
         `}>
-          {player.players.photo_url ? (
+          {hasPhoto ? (
             <Image
-              src={player.players.photo_url}
+              src={player.players.photo_url!}
               alt={player.players.name}
-              width={isSmall ? 48 : 64}
-              height={isSmall ? 48 : 64}
+              width={isSmall ? 44 : 56}
+              height={isSmall ? 44 : 56}
               className="w-full h-full object-cover object-top"
               unoptimized
             />
           ) : (
-            <span className={isSmall ? 'text-lg' : 'text-xl'}>👤</span>
+            <span className={isSmall ? 'text-base' : 'text-xl'}>👤</span>
           )}
         </div>
 
@@ -133,7 +124,7 @@ function PlayerToken({ player, size = 'md' }: { player: PitchPlayer; size?: 'sm'
       <span className={`
         text-white font-semibold leading-tight text-center
         truncate max-w-full
-        ${isSmall ? 'text-[10px]' : 'text-[11px] sm:text-xs'}
+        ${isSmall ? 'text-[9px]' : 'text-[10px]'}
       `}>
         {shortName(player.players.name)}
       </span>
@@ -141,7 +132,7 @@ function PlayerToken({ player, size = 'md' }: { player: PitchPlayer; size?: 'sm'
       {/* Nota */}
       <span className={`
         font-mono font-bold leading-none
-        ${isSmall ? 'text-[11px]' : 'text-xs sm:text-sm'}
+        ${isSmall ? 'text-[10px]' : 'text-xs'}
         ${getRatingColor(rating)}
       `}>
         {rating != null ? rating.toFixed(1) : '—'}
@@ -150,11 +141,20 @@ function PlayerToken({ player, size = 'md' }: { player: PitchPlayer; size?: 'sm'
   )
 }
 
+// Posicionamento absoluto por linha (% do topo do campo)
+// Reflete a imagem de referência: ATK no topo, GK na base
+const ROW_TOP: Record<string, string> = {
+  ATK: '6%',
+  MEI: '28%',
+  LAT: '50%',
+  ZAG: '68%',
+  GK:  '84%',
+}
+
 export function PitchView({ team, memberTeamName }: PitchViewProps) {
   const starters = team.filter(t => t.slot === 'starter')
   const bench = team.filter(t => t.slot === 'bench')
 
-  // Organiza titulares por posição
   const byPos = (pos: string) => starters.filter(p => p.position_slot === pos)
   const gks  = byPos('GK')
   const zags = byPos('ZAG')
@@ -162,41 +162,78 @@ export function PitchView({ team, memberTeamName }: PitchViewProps) {
   const meis = byPos('MEI')
   const atks = byPos('ATK')
 
-  // Linha do campo
-  const fieldRow = (players: PitchPlayer[], label: string) => (
-    <div className="relative flex items-center justify-center gap-2 sm:gap-4 w-full py-1">
-      {/* linha de separação sutil */}
-      {label !== 'GK' && (
-        <div className="absolute top-0 left-[10%] right-[10%] h-px bg-white/5" />
-      )}
-      {players.map(p => (
-        <PlayerToken key={p.id} player={p} />
-      ))}
-    </div>
-  )
-
   const totalRating = starters
     .filter(p => p.rating != null)
     .reduce((sum, p) => sum + (p.rating ?? 0), 0)
-
   const hasRatings = starters.some(p => p.rating != null)
 
+  // Renderiza uma linha de jogadores com posicionamento absoluto
+  // players: array de jogadores
+  // top: posição vertical
+  // spread: quanto espaço lateral cada posição ocupa
+  function FieldRow({
+    players,
+    top,
+    spread = 'center',
+  }: {
+    players: PitchPlayer[]
+    top: string
+    spread?: 'center' | 'wide' | 'full'
+  }) {
+    if (players.length === 0) return null
+
+    // Calcula posição horizontal de cada jogador
+    const getLeftPositions = () => {
+      const n = players.length
+      if (n === 1) return ['50%']
+      if (spread === 'full') {
+        // Distribuição máxima — ocupa quase toda a largura
+        const margin = 10
+        return players.map((_, i) => `${margin + (i * (100 - margin * 2)) / (n - 1)}%`)
+      }
+      if (spread === 'wide') {
+        // Bem espaçados mas não nas bordas extremas
+        const margin = 18
+        return players.map((_, i) => `${margin + (i * (100 - margin * 2)) / (n - 1)}%`)
+      }
+      // center: distribuição central moderada
+      const margin = 25
+      return players.map((_, i) => `${margin + (i * (100 - margin * 2)) / (n - 1)}%`)
+    }
+
+    const positions = getLeftPositions()
+
+    return (
+      <>
+        {players.map((p, i) => (
+          <div
+            key={p.id}
+            className="absolute -translate-x-1/2 -translate-y-1/2"
+            style={{ left: positions[i], top }}
+          >
+            <PlayerToken player={p} />
+          </div>
+        ))}
+      </>
+    )
+  }
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* Card do campinho */}
       <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-2xl bg-[#0d1a0f]">
 
         {/* Cabeçalho */}
-        <div className="flex justify-between items-center px-5 py-3 bg-black/40 border-b border-white/10">
+        <div className="flex justify-between items-center px-4 py-3 bg-black/40 border-b border-white/10">
           <div>
-            <h2 className="text-white font-bold text-lg tracking-tight">Meu Time</h2>
+            <h2 className="text-white font-bold text-base tracking-tight">Meu Time</h2>
             {memberTeamName && (
-              <p className="text-xs text-lime-300 mt-1">🏆 {memberTeamName}</p>
+              <p className="text-xs text-lime-300 mt-0.5">🏆 {memberTeamName}</p>
             )}
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             {hasRatings && (
-              <div className="flex items-center gap-1.5 bg-yellow-500/20 rounded-full px-3 py-1 border border-yellow-500/30">
+              <div className="flex items-center gap-1 bg-yellow-500/20 rounded-full px-2.5 py-1 border border-yellow-500/30">
                 <span className="text-yellow-400 font-mono font-bold text-sm">
                   {totalRating.toFixed(1)}
                 </span>
@@ -221,31 +258,26 @@ export function PitchView({ team, memberTeamName }: PitchViewProps) {
             <p>Seu time ainda não foi definido. Aguarde o draft!</p>
           </div>
         ) : (
-          <div
-            className="relative w-full select-none"
-            style={{ minHeight: '480px' }}
-          >
-            {/* Grama — gradiente e linhas do campo */}
+          <div className="relative w-full select-none" style={{ height: '440px' }}>
+            {/* Grama + linhas */}
             <FieldBackground />
 
-            {/* Jogadores sobrepostos */}
-            <div className="relative z-10 flex flex-col justify-between px-3 py-4 gap-1"
-                 style={{ minHeight: '480px' }}>
+            {/* Jogadores com posicionamento absoluto */}
+            <div className="absolute inset-0 z-10">
+              {/* ATK: 3 atacantes — bem distribuídos */}
+              <FieldRow players={atks} top={ROW_TOP.ATK} spread="wide" />
 
-              {/* ATK — linha do ataque (top, mais perto do gol adversário) */}
-              {fieldRow(atks, 'ATK')}
+              {/* MEI: 3 meias — distribuídos */}
+              <FieldRow players={meis} top={ROW_TOP.MEI} spread="center" />
 
-              {/* MEI */}
-              {fieldRow(meis, 'MEI')}
+              {/* LAT: 2 laterais — nas extremidades */}
+              <FieldRow players={lats} top={ROW_TOP.LAT} spread="full" />
 
-              {/* LAT */}
-              {fieldRow(lats, 'LAT')}
+              {/* ZAG: 2 zagueiros — centrais */}
+              <FieldRow players={zags} top={ROW_TOP.ZAG} spread="center" />
 
-              {/* ZAG */}
-              {fieldRow(zags, 'ZAG')}
-
-              {/* GK */}
-              {fieldRow(gks, 'GK')}
+              {/* GK: goleiro — centralizado */}
+              <FieldRow players={gks} top={ROW_TOP.GK} spread="center" />
             </div>
           </div>
         )}
@@ -253,16 +285,21 @@ export function PitchView({ team, memberTeamName }: PitchViewProps) {
 
       {/* Banco de Reservas */}
       {bench.length > 0 && (
-        <div className="bg-gray-900/80 rounded-xl border border-white/10 p-4">
-          <h3 className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-3 flex items-center gap-2">
-            <span className="w-5 h-px bg-gray-600 inline-block" />
+        <div className="bg-gray-900/80 rounded-xl border border-white/10 p-3">
+          <h3 className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mb-2 flex items-center gap-2">
+            <span className="w-4 h-px bg-gray-600 inline-block" />
             Banco de Reservas
             <span className="flex-1 h-px bg-gray-600 inline-block" />
           </h3>
-          <div className="flex items-start justify-around gap-2 flex-wrap">
-            {bench.map(p => (
-              <PlayerToken key={p.id} player={p} size="sm" />
-            ))}
+          <div className="flex items-start justify-around gap-1 flex-wrap">
+            {[...bench]
+              .sort((a, b) => {
+                const order = ['GK', 'ZAG', 'LAT', 'MEI', 'ATK']
+                return order.indexOf(a.position_slot) - order.indexOf(b.position_slot)
+              })
+              .map(p => (
+                <PlayerToken key={p.id} player={p} size="sm" />
+              ))}
           </div>
         </div>
       )}
@@ -282,58 +319,54 @@ function FieldBackground() {
 
       {/* Listras de grama */}
       <div className="absolute inset-0" style={{
-        backgroundImage: 'repeating-linear-gradient(180deg, transparent, transparent 58px, rgba(0,0,0,0.08) 58px, rgba(0,0,0,0.08) 116px)',
+        backgroundImage: 'repeating-linear-gradient(180deg, transparent, transparent 55px, rgba(0,0,0,0.07) 55px, rgba(0,0,0,0.07) 110px)',
       }} />
 
       {/* SVG com linhas do campo */}
       <svg
         className="absolute inset-0 w-full h-full"
-        viewBox="0 0 400 520"
+        viewBox="0 0 400 440"
         preserveAspectRatio="xMidYMid slice"
         fill="none"
         stroke="rgba(255,255,255,0.15)"
         strokeWidth="1.2"
       >
         {/* Borda do campo */}
-        <rect x="16" y="16" width="368" height="488" rx="2" />
+        <rect x="16" y="10" width="368" height="420" rx="2" />
 
         {/* Linha do meio */}
-        <line x1="16" y1="260" x2="384" y2="260" />
+        <line x1="16" y1="220" x2="384" y2="220" />
 
         {/* Círculo central */}
-        <circle cx="200" cy="260" r="52" />
-        <circle cx="200" cy="260" r="2" fill="rgba(255,255,255,0.3)" stroke="none" />
+        <circle cx="200" cy="220" r="48" />
+        <circle cx="200" cy="220" r="2" fill="rgba(255,255,255,0.3)" stroke="none" />
 
         {/* Área (ataque - topo) */}
-        <rect x="96" y="16" width="208" height="78" />
-        {/* Pequena área (topo) */}
-        <rect x="148" y="16" width="104" height="32" />
+        <rect x="96" y="10" width="208" height="70" />
+        <rect x="148" y="10" width="104" height="28" />
 
         {/* Área (defesa - baixo) */}
-        <rect x="96" y="426" width="208" height="78" />
-        {/* Pequena área (baixo) */}
-        <rect x="148" y="472" width="104" height="32" />
+        <rect x="96" y="360" width="208" height="70" />
+        <rect x="148" y="402" width="104" height="28" />
 
-        {/* Ponto pênalti topo */}
-        <circle cx="200" cy="72" r="2" fill="rgba(255,255,255,0.3)" stroke="none" />
-        {/* Ponto pênalti baixo */}
-        <circle cx="200" cy="448" r="2" fill="rgba(255,255,255,0.3)" stroke="none" />
+        {/* Pontos de pênalti */}
+        <circle cx="200" cy="64" r="2" fill="rgba(255,255,255,0.3)" stroke="none" />
+        <circle cx="200" cy="376" r="2" fill="rgba(255,255,255,0.3)" stroke="none" />
 
-        {/* Arco da área topo */}
-        <path d="M 140 94 A 60 60 0 0 1 260 94" />
-        {/* Arco da área baixo */}
-        <path d="M 140 426 A 60 60 0 0 0 260 426" />
+        {/* Arcos de área */}
+        <path d="M 144 80 A 56 56 0 0 1 256 80" />
+        <path d="M 144 360 A 56 56 0 0 0 256 360" />
 
         {/* Cantos */}
-        <path d="M16 24 Q16 16 24 16" />
-        <path d="M376 16 Q384 16 384 24" />
-        <path d="M384 496 Q384 504 376 504" />
-        <path d="M24 504 Q16 504 16 496" />
+        <path d="M16 18 Q16 10 24 10" />
+        <path d="M376 10 Q384 10 384 18" />
+        <path d="M384 422 Q384 430 376 430" />
+        <path d="M24 430 Q16 430 16 422" />
       </svg>
 
-      {/* Sombra nas bordas para profundidade */}
+      {/* Sombra nas bordas */}
       <div className="absolute inset-0"
-           style={{ boxShadow: 'inset 0 0 60px rgba(0,0,0,0.4)' }} />
+           style={{ boxShadow: 'inset 0 0 50px rgba(0,0,0,0.35)' }} />
     </div>
   )
 }

@@ -64,7 +64,20 @@ export default function AuthProcessingPage() {
 
       console.log('[Processing] ✓ Sessão criada para:', data.session.user.email)
       setMensagem('Login feito! Redirecionando...')
-      router.replace('/admin')
+
+      // Verificar se o usuário é admin de algum grupo
+      // para redirecionar para o lugar certo
+      const { data: adminGroup } = await supabase
+        .from('groups')
+        .select('id')
+        .eq('admin_id', data.session.user.id)
+        .maybeSingle()
+
+      if (adminGroup) {
+        router.replace('/admin')
+      } else {
+        router.replace('/app')
+      }
     }
 
     processarHash()
