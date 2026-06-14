@@ -4,16 +4,17 @@
 
 import { LoginForm } from './login-form'
 
-export default function LoginPage({
+export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: { error?: string; redirect?: string }
+  searchParams: Promise<{ error?: string; redirect?: string }>
 }) {
+  const params = await searchParams
   let errorMessage = ''
   
-  if (searchParams.error === 'auth_failed') {
+  if (params.error === 'auth_failed') {
     errorMessage = 'Falha na autenticação. Tente solicitar um novo link.'
-  } else if (searchParams.error === 'confirm_failed') {
+  } else if (params.error === 'confirm_failed') {
     errorMessage = 'Link inválido ou expirado. Solicite um novo.'
   }
 

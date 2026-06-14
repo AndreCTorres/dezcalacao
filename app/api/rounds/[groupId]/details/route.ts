@@ -6,10 +6,10 @@ import { NextResponse } from 'next/server'
 
 export async function GET(
   request: Request,
-  { params }: { params: { groupId: string } }
+  { params }: { params: Promise<{ groupId: string }> }
 ) {
   try {
-    const { groupId } = params
+    const { groupId } = await params
     const admin = supabaseAdmin()
 
     // 1. Buscar rodadas do grupo (ordenadas mais recentes primeiro)

@@ -8,7 +8,7 @@ import { GroupPanel } from './group-panel'
 
 export default async function AdminHome() {
   // Cliente para autenticação (getUser funciona)
-  const supabase = createActionClient()
+  const supabase = await createActionClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {

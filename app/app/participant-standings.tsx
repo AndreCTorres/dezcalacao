@@ -50,8 +50,8 @@ export function ParticipantStandings({ groupId, members, currentMemberId }: Part
 
     fetchStandings()
 
-    // Atualizar a cada 30 segundos
-    const interval = setInterval(fetchStandings, 30000)
+    // Atualizar a cada 5 minutos (ranking não muda com frequência)
+    const interval = setInterval(fetchStandings, 5 * 60 * 1000)
     return () => clearInterval(interval)
   }, [groupId, members])
 
@@ -135,7 +135,7 @@ export function ParticipantStandings({ groupId, members, currentMemberId }: Part
           </p>
           {lastUpdate && (
             <p className="text-xs text-gray-600">
-              Atualiza a cada 30s
+              Atualiza a cada 5min
             </p>
           )}
         </div>

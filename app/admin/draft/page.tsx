@@ -10,7 +10,7 @@ import { LogoutButton } from '@/app/components/logout-button'
 
 export default async function DraftPage() {
   // Validar autenticação
-  const supabase = createActionClient()
+  const supabase = await createActionClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
@@ -27,6 +27,11 @@ export default async function DraftPage() {
 
   if (!group) {
     redirect('/admin')
+  }
+
+  // Se draft já foi fechado, redireciona para a área do participante
+  if (group.status !== 'setup') {
+    redirect('/app')
   }
 
   // Buscar membros
@@ -54,22 +59,12 @@ export default async function DraftPage() {
             {group.name} — Draft
           </h1>
           <p className="text-gray-400">
-            {group.status === 'setup' ? (
-              <>Registre os jogadores de cada membro. O draft termina quando todos têm 16 jogadores (11 titulares + 5 reservas).</>
-            ) : (
-              <>Draft fechado. Grupo ativo.</>
-            )}
+            Registre os jogadores de cada membro. O draft termina quando todos têm 16 jogadores (11 titulares + 5 reservas).
           </p>
         </div>
 
         {/* Draft Interface */}
-        {group.status === 'setup' ? (
-          <DraftInterface groupId={group.id} members={members || []} />
-        ) : (
-          <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-            <p className="text-gray-400">O draft já foi finalizado. Status: {group.status}</p>
-          </div>
-        )}
+        <DraftInterface groupId={group.id} members={members || []} />
       </div>
     </div>
   )

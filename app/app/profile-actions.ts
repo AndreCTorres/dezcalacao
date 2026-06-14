@@ -22,7 +22,7 @@ export async function updateMemberProfile(
     }
 
     // Verificar autenticação
-    const supabase = createActionClient()
+    const supabase = await createActionClient()
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {

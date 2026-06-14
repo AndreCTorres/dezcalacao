@@ -9,7 +9,7 @@ import { SubstitutionInterface } from '../substitution-interface'
 import { getActiveRound } from '../substitutions-actions'
 
 export default async function MyTeamPage() {
-  const supabase = createActionClient()
+  const supabase = await createActionClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {

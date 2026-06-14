@@ -15,7 +15,7 @@ export async function createGroup(formData: FormData) {
   }
 
   // Cliente para autenticação (getUser funciona)
-  const supabase = createActionClient()
+  const supabase = await createActionClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   
   console.log('[createGroup] User:', { id: user?.id, email: user?.email })
@@ -132,7 +132,7 @@ export async function addMember(formData: FormData) {
   }
 
   // Cliente para autenticação
-  const supabase = createActionClient()
+  const supabase = await createActionClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   
   if (authError || !user) {
@@ -376,7 +376,7 @@ function mapPosition(apiPosition: string): string {
 }
 
 export async function syncPlayers() {
-  const supabase = createActionClient()
+  const supabase = await createActionClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
 
   if (authError || !user) {

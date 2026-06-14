@@ -16,7 +16,7 @@ export async function assignPlayerToMember(
   positionSlot: Position
 ) {
   // Validar autenticação
-  const supabase = createActionClient()
+  const supabase = await createActionClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
 
   if (authError || !user) {
@@ -121,7 +121,7 @@ export async function unassignPlayer(
   teamPlayerId: string
 ) {
   // Validar autenticação
-  const supabase = createActionClient()
+  const supabase = await createActionClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
 
   if (authError || !user) {
@@ -161,7 +161,7 @@ export async function unassignPlayer(
 
 export async function closeDraft(groupId: string) {
   // Validar autenticação
-  const supabase = createActionClient()
+  const supabase = await createActionClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
 
   if (authError || !user) {
@@ -213,7 +213,7 @@ export async function closeDraft(groupId: string) {
 
 export async function searchPlayers(query: string, groupId: string) {
   // Validar autenticação
-  const supabase = createActionClient()
+  const supabase = await createActionClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
 
   if (authError || !user) {
@@ -269,7 +269,7 @@ export async function searchPlayers(query: string, groupId: string) {
 
 export async function getDraftState(groupId: string) {
   // Validar autenticação
-  const supabase = createActionClient()
+  const supabase = await createActionClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
 
   if (authError || !user) {
@@ -359,7 +359,7 @@ export async function bulkImportDraft(
     return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
   }
   // Validar autenticação
-  const supabase = createActionClient()
+  const supabase = await createActionClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
 
   if (authError || !user) {

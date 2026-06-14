@@ -7,8 +7,8 @@ import { cookies } from 'next/headers'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 
 // Cliente para Server Components (read-only, com try/catch para silenciar erros)
-export function createClient() {
-  const cookieStore = cookies()
+export async function createClient() {
+  const cookieStore = await cookies()
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -34,8 +34,8 @@ export function createClient() {
 
 // Cliente para Server Actions (pode escrever cookies)
 // Usa API moderna getAll/setAll para reconstruir sessão corretamente
-export function createActionClient() {
-  const cookieStore = cookies()
+export async function createActionClient() {
+  const cookieStore = await cookies()
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

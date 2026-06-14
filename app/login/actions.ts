@@ -8,11 +8,17 @@ import { cookies } from 'next/headers'
 
 // Login com e-mail + senha (para usuários locais tipo lucas@dezcalacao.local)
 export async function signInWithPassword(email: string, password: string) {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+  console.log('[Login] Usando Supabase URL:', url?.substring(0, 30) + '...')
+  console.log('[Login] Anon key presente:', !!anonKey)
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    url,
+    anonKey,
     {
       cookies: {
         getAll() { return cookieStore.getAll() },
@@ -44,7 +50,7 @@ export async function signInWithPassword(email: string, password: string) {
 
 // Login com magic link (para e-mails reais, ex: admin)
 export async function signInWithEmail(email: string) {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

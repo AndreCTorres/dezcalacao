@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     type: searchParams.get('type'),
   })
 
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -45,6 +45,8 @@ export async function GET(request: Request) {
 
       if (!error && data.session) {
         console.log('[Callback] ✓ Sessão criada para:', data.session.user.email)
+        // Redirecionar para /app por padrão — /admin redireciona participantes de volta
+        // e /app agora auto-vincula convites pendentes
         return NextResponse.redirect(`${origin}${next}`)
       }
 

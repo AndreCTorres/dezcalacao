@@ -10,9 +10,12 @@ import { ProfileEditButton } from './profile-edit-button'
 import { PitchView, type PitchPlayer } from './pitch-view'
 import { ParticipantStandings } from './participant-standings'
 import { RoundDetails } from './round-details'
+import { PostRoundSwaps } from './post-round-swaps'
+import { getPostRoundData } from './post-round-actions'
+import { PlayerRatingsView } from './player-ratings-view'
 
 export default async function AppPage() {
-  const supabase = createActionClient()
+  const supabase = await createActionClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
@@ -25,86 +28,58 @@ export default async function AppPage() {
   const displayName = user.user_metadata?.display_name || user.email?.split('@')[0] || 'Participante'
   await admin.from('profiles').upsert({ id: user.id, display_name: displayName }, { onConflict: 'id' })
 
-  // Buscar grupo do participante (já vinculado)
-  let { data: membership } = await admin
+  // Buscar membership do participante (sem join para evitar problemas de cache de schema)
+  const { data: memberships, error: membershipError } = await admin
     .from('group_members')
-    .select(
-      `
-      id,
-      group_id,
-      display_name,
-      team_name,
-      groups (
-        id,
-        name,
-        status,
-        season,
-        admin_id
-      )
-    `
-    )
+    .select('id, group_id, display_name, team_name')
     .eq('profile_id', user.id)
     .eq('status', 'joined')
-    .single()
+    .limit(1)
 
-  // Se não encontrou membership ativa, verificar se existe convite pendente pelo e-mail
-  if (!membership && user.email) {
-    const { data: pendingInvite } = await admin
+  if (membershipError) {
+    console.error('[AppPage] Erro ao buscar membership:', membershipError?.message, membershipError?.code)
+  }
+
+  let membershipRow = memberships?.[0] ?? null
+
+  // Tentativa de auto-vinculação: se não encontrou por profile_id,
+  // verifica se existe um convite pendente com o e-mail do usuário
+  if (!membershipRow && user.email) {
+    console.log('[AppPage] Tentando auto-vincular por e-mail:', user.email)
+
+    const { data: invitedMemberships } = await admin
       .from('group_members')
-      .select(
-        `
-        id,
-        group_id,
-        display_name,
-        team_name,
-        groups (
-          id,
-          name,
-          status,
-          season,
-          admin_id
-        )
-      `
-      )
+      .select('id, group_id, display_name, team_name')
       .eq('invite_email', user.email)
-      .eq('status', 'invited')
-      .single()
+      .is('profile_id', null)
+      .limit(1)
 
-    if (pendingInvite) {
-      // Aceitar convite automaticamente: linkar profile_id e marcar como joined
-      const { data: updatedMember } = await admin
+    const invitedMembership = invitedMemberships?.[0] ?? null
+
+    if (invitedMembership) {
+      console.log('[AppPage] Convite encontrado para', user.email, '— vinculando profile_id...')
+
+      // Vincular profile_id e atualizar status para joined
+      const { error: updateError } = await admin
         .from('group_members')
         .update({
           profile_id: user.id,
           status: 'joined',
           joined_at: new Date().toISOString(),
         })
-        .eq('id', pendingInvite.id)
-        .select(
-          `
-          id,
-          group_id,
-          display_name,
-          team_name,
-          groups (
-            id,
-            name,
-            status,
-            season,
-            admin_id
-          )
-        `
-        )
-        .single()
+        .eq('id', invitedMembership.id)
 
-      if (updatedMember) {
-        membership = updatedMember
-        console.log('[AppPage] ✓ Convite aceito automaticamente para:', user.email)
+      if (!updateError) {
+        console.log('[AppPage] ✓ Membro vinculado com sucesso')
+        membershipRow = invitedMembership
+      } else {
+        console.error('[AppPage] Erro ao vincular membro:', updateError?.message)
       }
     }
   }
 
-  if (!membership || !membership.groups) {
+  if (!membershipRow) {
+    console.log('[AppPage] Membership não encontrado para user:', user.id)
     return (
       <div className="min-h-screen bg-gray-900 text-white p-8 flex items-center justify-center">
         <div className="text-center">
@@ -116,7 +91,27 @@ export default async function AppPage() {
     )
   }
 
-  const group = membership.groups as any
+  // Buscar grupo separadamente (evita problema de join/schema cache)
+  const { data: group, error: groupError } = await admin
+    .from('groups')
+    .select('id, name, status, season, admin_id')
+    .eq('id', membershipRow.group_id)
+    .single()
+
+  if (groupError || !group) {
+    console.error('[AppPage] Erro ao buscar grupo:', groupError?.message)
+    return (
+      <div className="min-h-screen bg-gray-900 text-white p-8 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-lime-400 mb-2">Erro ao carregar grupo</h1>
+          <p className="text-gray-400 mb-4">Tente novamente mais tarde</p>
+          <LogoutButton />
+        </div>
+      </div>
+    )
+  }
+
+  const membership = membershipRow
   const groupMemberId = membership.id
   const isAdmin = group.admin_id === user.id
 
@@ -180,6 +175,9 @@ export default async function AppPage() {
     .from('group_members')
     .select('id, display_name, profile_id, status')
     .eq('group_id', group.id)
+
+  // Buscar dados de trocas pós-rodada (rodada scored mais recente)
+  const postRoundData = await getPostRoundData(groupMemberId)
 
   return (
     <div className="min-h-screen text-white" style={{ background: '#0a0e0c' }}>
@@ -262,6 +260,20 @@ export default async function AppPage() {
           </div>
         </div>
 
+        {/* Trocas Pós-Rodada */}
+        {postRoundData.success && postRoundData.round && (
+          <div className="mt-6">
+            <PostRoundSwaps
+              groupMemberId={groupMemberId}
+              roundId={postRoundData.round.id}
+              roundName={postRoundData.round.name}
+              players={postRoundData.players!}
+              confirmedSwaps={postRoundData.confirmedSwaps!}
+              maxSwaps={postRoundData.maxSwaps!}
+            />
+          </div>
+        )}
+
         {/* Detalhes de Rodadas */}
         <div className="mt-6">
           <h2
@@ -271,6 +283,17 @@ export default async function AppPage() {
             📊 Pontuação por Rodada
           </h2>
           <RoundDetails groupId={group.id} currentMemberId={groupMemberId} />
+        </div>
+
+        {/* Notas dos jogadores */}
+        <div className="mt-6">
+          <h2
+            className="text-xl font-bold text-lime-400 mb-4"
+            style={{ fontFamily: 'Anton, sans-serif', textTransform: 'uppercase', letterSpacing: '1px' }}
+          >
+            ⭐ Notas dos Jogadores
+          </h2>
+          <PlayerRatingsView groupId={group.id} memberId={groupMemberId} />
         </div>
 
       </div>
