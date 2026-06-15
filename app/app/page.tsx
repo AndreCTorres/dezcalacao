@@ -12,7 +12,6 @@ import { ParticipantStandings } from './participant-standings'
 import { RoundDetails } from './round-details'
 import { PostRoundSwaps } from './post-round-swaps'
 import { getPostRoundData } from './post-round-actions'
-import { PlayerRatingsView } from './player-ratings-view'
 
 export default async function AppPage() {
   const supabase = await createActionClient()
@@ -147,19 +146,77 @@ export default async function AppPage() {
     .limit(1)
     .maybeSingle()
 
-  // Buscar ratings da rodada mais recente
+  const { data: latestScoredRound } = await admin
+    .from('rounds')
+    .select('id, name, status')
+    .eq('group_id', group.id)
+    .eq('status', 'scored')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  // Prioridade: rodada pontuada > qualquer rodada com ratings no banco
+  // Busca todas as rodadas e encontra a mais recente com ratings reais
+  let ratingsRound = latestScoredRound ?? null
+
+  if (!ratingsRound && teamPlayers && teamPlayers.length > 0) {
+    // Não há rodada scored — procurar rodada open que já tenha ratings inseridos
+    const { data: allRounds } = await admin
+      .from('rounds')
+      .select('id, name, status')
+      .eq('group_id', group.id)
+      .in('status', ['scored', 'open'])
+      .order('created_at', { ascending: false })
+
+    if (allRounds) {
+      const teamPlayerIds = teamPlayers.map((tp: any) => tp.player_id)
+      for (const round of allRounds) {
+        const { count } = await admin
+          .from('player_round_ratings')
+          .select('id', { count: 'exact', head: true })
+          .eq('round_id', round.id)
+          .in('player_id', teamPlayerIds)
+          .not('rating', 'is', null)
+        if ((count ?? 0) > 0) {
+          ratingsRound = round
+          break
+        }
+      }
+    }
+  }
+
+  const normalizeRatingKey = (name?: string | null, teamName?: string | null) =>
+    `${name ?? ''}|${teamName ?? ''}`
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9|]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+
+  // Buscar ratings da rodada pontuada mais recente
+  // Filtra pelos player_ids do time para garantir que reservas com nota apareçam
   let ratingsMap: Record<number, number | null> = {}
-  if (latestRound && teamPlayers) {
-    const playerIds = teamPlayers.map((tp: any) => tp.player_id)
+  let ratingsByPlayerKey: Record<string, number | null> = {}
+  if (ratingsRound && teamPlayers && teamPlayers.length > 0) {
+    const teamPlayerIds = teamPlayers.map((tp: any) => tp.player_id)
+
     const { data: ratings } = await admin
       .from('player_round_ratings')
-      .select('player_id, rating')
-      .eq('round_id', latestRound.id)
-      .in('player_id', playerIds)
+      .select('player_id, rating, players ( name, team_name )')
+      .eq('round_id', ratingsRound.id)
+      .in('player_id', teamPlayerIds)
 
     if (ratings) {
-      for (const r of ratings) {
-        ratingsMap[r.player_id] = r.rating
+      for (const r of ratings as any[]) {
+        // Inclui todos, mesmo rating null (para saber que o registro existe)
+        // mas só coloca no map se tiver nota real
+        if (r.rating != null) {
+          ratingsMap[r.player_id] = r.rating
+        }
+        const ratingPlayer = Array.isArray(r.players) ? r.players[0] : r.players
+        const playerKey = normalizeRatingKey(ratingPlayer?.name, ratingPlayer?.team_name)
+        if (playerKey && r.rating != null) ratingsByPlayerKey[playerKey] = r.rating
       }
     }
   }
@@ -167,7 +224,10 @@ export default async function AppPage() {
   // Montar team com ratings
   const teamWithRatings: PitchPlayer[] = (teamPlayers || []).map((tp: any) => ({
     ...tp,
-    rating: ratingsMap[tp.player_id] ?? null,
+    rating:
+      ratingsMap[tp.player_id] ??
+      ratingsByPlayerKey[normalizeRatingKey(tp.players?.name, tp.players?.team_name)] ??
+      null,
   }))
 
   // Buscar membros do grupo para ranking
@@ -181,10 +241,10 @@ export default async function AppPage() {
 
   return (
     <div className="min-h-screen text-white" style={{ background: '#0a0e0c' }}>
-      <div className="max-w-6xl mx-auto px-4 py-6 sm:px-6 sm:py-8">
+      <div className="w-full max-w-[1440px] mx-auto px-3 py-3 sm:px-5 sm:py-4 xl:px-8">
 
         {/* Header */}
-        <div className="flex justify-between items-start mb-8 gap-4">
+        <div className="flex justify-between items-start mb-5 gap-4">
           <div className="flex-1">
             <Link href="/" className="text-lime-400 hover:text-lime-300 text-sm mb-3 inline-block">
               ← Dezcalação
@@ -224,7 +284,7 @@ export default async function AppPage() {
         </div>
 
         {/* Bem-vindo */}
-        <div className="mb-8 p-4 bg-gray-800/30 backdrop-blur rounded-lg border border-gray-700/50 flex justify-between items-center">
+        <div className="mb-5 p-3 bg-gray-800/30 backdrop-blur rounded-lg border border-gray-700/50 flex justify-between items-center">
           <div>
             <p className="text-gray-300 text-sm">
               👋 Bem-vindo, <span className="text-lime-400 font-semibold">{membership.display_name}</span>
@@ -243,26 +303,27 @@ export default async function AppPage() {
         </div>
 
         {/* Grid principal */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(440px,500px)_1fr] gap-5 mb-5 items-stretch max-h-[650px] overflow-hidden">
 
-          {/* Campinho — ocupa 2 colunas no desktop */}
-          <div className="lg:col-span-2">
+          {/* Campinho + Banco */}
+          <div className="w-full h-full">
             <PitchView team={teamWithRatings} memberTeamName={membership.team_name} />
           </div>
 
-          {/* Ranking */}
-          <div className="lg:col-span-1">
+          {/* Ranking + Rodadas — ocupam todo o espaço restante */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 h-full items-stretch overflow-hidden">
             <ParticipantStandings
               groupId={group.id}
               members={members || []}
               currentMemberId={groupMemberId}
             />
+            <RoundDetails groupId={group.id} currentMemberId={groupMemberId} />
           </div>
         </div>
 
         {/* Trocas Pós-Rodada */}
         {postRoundData.success && postRoundData.round && (
-          <div className="mt-6">
+          <div className="mb-4">
             <PostRoundSwaps
               groupMemberId={groupMemberId}
               roundId={postRoundData.round.id}
@@ -273,28 +334,6 @@ export default async function AppPage() {
             />
           </div>
         )}
-
-        {/* Detalhes de Rodadas */}
-        <div className="mt-6">
-          <h2
-            className="text-xl font-bold text-lime-400 mb-4"
-            style={{ fontFamily: 'Anton, sans-serif', textTransform: 'uppercase', letterSpacing: '1px' }}
-          >
-            📊 Pontuação por Rodada
-          </h2>
-          <RoundDetails groupId={group.id} currentMemberId={groupMemberId} />
-        </div>
-
-        {/* Notas dos jogadores */}
-        <div className="mt-6">
-          <h2
-            className="text-xl font-bold text-lime-400 mb-4"
-            style={{ fontFamily: 'Anton, sans-serif', textTransform: 'uppercase', letterSpacing: '1px' }}
-          >
-            ⭐ Notas dos Jogadores
-          </h2>
-          <PlayerRatingsView groupId={group.id} memberId={groupMemberId} />
-        </div>
 
       </div>
     </div>

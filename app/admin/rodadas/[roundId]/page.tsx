@@ -67,6 +67,15 @@ export default async function RoundRatingsPage({ params }: PageProps) {
     ratedCount: countByFixture[f.id] ?? 0,
   }))
 
+  const { data: playerTeams } = await admin
+    .from('players')
+    .select('team_name')
+    .order('team_name', { ascending: true })
+
+  const teamOptions = Array.from(
+    new Set((playerTeams ?? []).map((p: any) => p.team_name).filter(Boolean))
+  )
+
   return (
     <div className="min-h-screen bg-gray-900 text-white p-4 sm:p-8">
       <div className="max-w-3xl mx-auto">
@@ -107,6 +116,7 @@ export default async function RoundRatingsPage({ params }: PageProps) {
           roundName={round.name}
           roundStatus={round.status}
           fixtures={fixturesWithCount}
+          teamOptions={teamOptions}
         />
 
         {/* Guia */}

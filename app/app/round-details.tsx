@@ -1,7 +1,7 @@
 'use client'
 
 // app/app/round-details.tsx
-// Exibe detalhes de pontuação por rodada
+// Exibe detalhes de pontuação por rodada — ordem cronológica (Rodada 1 primeiro, Final por último)
 
 import { useState, useEffect } from 'react'
 
@@ -23,13 +23,11 @@ interface RoundDetailsProps {
 export function RoundDetails({ groupId, currentMemberId }: RoundDetailsProps) {
   const [rounds, setRounds] = useState<RoundDetail[]>([])
   const [loading, setLoading] = useState(true)
-  const [expanded, setExpanded] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchRounds = async () => {
       setLoading(true)
       try {
-        // Buscar rodadas do grupo
         const res = await fetch(`/api/rounds/${groupId}/details`, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },
@@ -37,7 +35,9 @@ export function RoundDetails({ groupId, currentMemberId }: RoundDetailsProps) {
 
         if (res.ok) {
           const data = await res.json()
-          setRounds(data.rounds || [])
+          // Inverte para ordem cronológica: Rodada 1 primeiro, Final por último
+          const sorted = [...(data.rounds || [])].reverse()
+          setRounds(sorted)
         }
       } catch (error) {
         console.error('[RoundDetails] Erro:', error)
@@ -65,44 +65,35 @@ export function RoundDetails({ groupId, currentMemberId }: RoundDetailsProps) {
   }
 
   return (
-    <div className="space-y-3">
-      {rounds.map((round) => (
-        <div
-          key={round.roundId}
-          className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden"
-        >
-          <button
-            onClick={() => setExpanded(expanded === round.roundId ? null : round.roundId)}
-            className="w-full px-4 py-3 flex justify-between items-center hover:bg-gray-700/50 transition"
-          >
-            <span className="font-semibold text-white">{round.roundName}</span>
-            <span className="text-gray-400">{expanded === round.roundId ? '−' : '+'}</span>
-          </button>
-
-          {expanded === round.roundId && (
-            <div className="px-4 py-3 bg-gray-900/50 border-t border-gray-700 space-y-2">
-              {round.scores.map((score) => {
-                const isCurrent = score.memberId === currentMemberId
-                return (
-                  <div
-                    key={score.memberId}
-                    className={`flex justify-between items-center p-2 rounded ${
-                      isCurrent ? 'bg-lime-400/10' : 'bg-gray-800/50'
-                    }`}
-                  >
-                    <span className={isCurrent ? 'text-lime-400 font-medium' : 'text-gray-300'}>
-                      {score.memberName}
-                    </span>
-                    <span className={isCurrent ? 'font-bold text-lime-400' : 'text-gray-400'}>
-                      {score.points} pts
-                    </span>
-                  </div>
-                )
-              })}
+    <div>
+      <h2
+        className="text-lg font-bold text-lime-400 mb-3"
+        style={{ fontFamily: 'Anton, sans-serif', textTransform: 'uppercase', letterSpacing: '1px' }}
+      >
+        📊 Pontuação por Rodadas
+      </h2>
+      <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
+        {rounds.map((round) => {
+          // Encontra o score do membro atual
+          const currentScore = round.scores.find(s => s.memberId === currentMemberId)
+          
+          return (
+            <div
+              key={round.roundId}
+              className="bg-gray-800 rounded-lg border border-gray-700 px-4 py-3 flex justify-between items-center hover:bg-gray-700/50 transition"
+            >
+              <span className="font-semibold text-white">{round.roundName}</span>
+              {currentScore ? (
+                <span className="font-bold text-lime-400 bg-lime-500/20 px-3 py-1 rounded-full text-sm">
+                  {currentScore.points} pts
+                </span>
+              ) : (
+                <span className="text-gray-500 text-sm">—</span>
+              )}
             </div>
-          )}
-        </div>
-      ))}
+          )
+        })}
+      </div>
     </div>
   )
 }

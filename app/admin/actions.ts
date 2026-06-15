@@ -214,7 +214,7 @@ export async function linkMemberToEmail(formData: FormData) {
     return { error: 'E-mail inválido', success: false }
   }
 
-  const supabase = createActionClient()
+  const supabase = await createActionClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) {
     return { error: 'Você precisa estar logado', success: false }
@@ -244,7 +244,9 @@ export async function linkMemberToEmail(formData: FormData) {
 
   // Buscar o usuário pelo e-mail no Auth
   const { data: userList } = await admin.auth.admin.listUsers()
-  const targetUser = userList?.users?.find(u => u.email?.toLowerCase() === email.trim().toLowerCase())
+  const targetUser = (userList?.users as any[] | undefined)?.find(
+    (u) => u.email?.toLowerCase() === email.trim().toLowerCase()
+  )
 
   if (!targetUser) {
     return { error: `Nenhuma conta encontrada com o e-mail "${email.trim()}". O usuário precisa ter feito login pelo menos uma vez.`, success: false }

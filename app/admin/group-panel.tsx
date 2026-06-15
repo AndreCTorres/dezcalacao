@@ -101,7 +101,7 @@ export function GroupPanel({ group, members, isAdmin }: GroupPanelProps) {
                   {members.length}
                 </span>
               </div>
-              <div className="space-y-2 max-h-80 overflow-y-auto">
+              <div className="space-y-2 max-h-80 overflow-y-auto mb-4">
                 {members.length === 0 ? (
                   <p className="text-gray-500 text-sm py-4 text-center">Nenhum membro ainda</p>
                 ) : (
@@ -150,18 +150,19 @@ export function GroupPanel({ group, members, isAdmin }: GroupPanelProps) {
                   ))
                 )}
               </div>
-            </div>
 
-            {/* Card: Adicionar Membro (só para admin) */}
-            {isAdmin && (
-              <div className="bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700/50 hover:border-gray-600/50 transition">
-                <h2 className="text-lg font-bold text-lime-400 mb-4">➕ Adicionar Membro</h2>
+              {/* Divisor */}
+              {isAdmin && <div className="border-t border-gray-700/50 my-4"></div>}
+
+              {/* Adicionar Membro — dentro do mesmo card */}
+              {isAdmin && (
                 <div className="space-y-3">
+                  <h3 className="text-sm font-bold text-lime-400">➕ Adicionar Membro</h3>
                   <AddMemberForm groupId={group.id} />
                   <SeedUsersButton groupId={group.id} />
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
           {/* Coluna Direita: Cards de ações principais */}
@@ -254,38 +255,7 @@ export function GroupPanel({ group, members, isAdmin }: GroupPanelProps) {
           </div>
         </div>
 
-        {/* Seção de próximos passos */}
-        <div className="bg-gradient-to-r from-gray-800/50 to-gray-800/30 backdrop-blur rounded-xl p-6 border border-gray-700/50">
-          <h3 className="text-lg font-bold text-lime-400 mb-4 flex items-center gap-2">
-            🚀 Próximos Passos
-          </h3>
-          <ol className="space-y-3 text-gray-300 text-sm">
-            <li className={`flex items-start gap-3 ${members.length >= 2 ? 'opacity-50' : ''}`}>
-              <span className={`font-bold flex-shrink-0 mt-0.5 ${members.length >= 2 ? 'text-gray-500' : 'text-lime-400'}`}>
-                {members.length >= 2 ? '✓' : '1.'}
-              </span>
-              <span className={members.length >= 2 ? 'line-through text-gray-500' : ''}>
-                Adicione membros ao grupo (mínimo 2 para jogar)
-              </span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="font-bold flex-shrink-0 text-lime-400 mt-0.5">2.</span>
-              <span>Sincronize os jogadores convocados da API-Football</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="font-bold flex-shrink-0 text-lime-400 mt-0.5">3.</span>
-              <span>Realize o draft atribuindo jogadores aos membros</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="font-bold flex-shrink-0 text-lime-400 mt-0.5">4.</span>
-              <span>Configure e gerencie as rodadas do torneio</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="font-bold flex-shrink-0 text-lime-400 mt-0.5">5.</span>
-              <span>Calcule as pontuações após cada rodada</span>
-            </li>
-          </ol>
-        </div>
+
       </div>
     </div>
   )

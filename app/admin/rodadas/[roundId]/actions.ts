@@ -22,6 +22,13 @@ export async function createManualFixture(
   if (authError || !user) return { success: false, error: 'Não autenticado' }
 
   const admin = supabaseAdmin()
+  const cleanHome = homeTeam.trim()
+  const cleanAway = awayTeam.trim()
+  const cleanLabel = label?.trim()
+
+  if (!cleanHome || !cleanAway) {
+    return { success: false, error: 'Informe as duas selecoes' }
+  }
 
   // Validar que a rodada pertence a um grupo do qual o user é admin
   const { data: round } = await admin
@@ -42,9 +49,9 @@ export async function createManualFixture(
     .insert({
       id: manualId,
       round_id: roundId,
-      home_team: homeTeam.trim(),
-      away_team: awayTeam.trim(),
-      label: label?.trim() || `${homeTeam.trim()} x ${awayTeam.trim()}`,
+      home_team: cleanHome,
+      away_team: cleanAway,
+      label: cleanLabel || `${cleanHome} x ${cleanAway}`,
       status: 'FT',
     })
     .select()
@@ -55,7 +62,23 @@ export async function createManualFixture(
     return { success: false, error: error.message }
   }
 
+  const { data: roundFixtures } = await admin
+    .from('fixtures')
+    .select('id')
+    .eq('round_id', roundId)
+
+  const fixtureIds = (roundFixtures ?? []).map((f: any) => f.id)
+  await admin
+    .from('rounds')
+    .update({
+      fixture_ids: fixtureIds,
+      fixtures_total: fixtureIds.length,
+      fixtures_done: fixtureIds.length,
+    })
+    .eq('id', roundId)
+
   revalidatePath(`/admin/rodadas/${roundId}`)
+  revalidatePath('/admin/rodadas')
   return { success: true, fixture }
 }
 
@@ -141,6 +164,15 @@ export async function upsertBatchRatings(
 
   if (!round || (round.groups as any).admin_id !== user.id) {
     return { success: false, error: 'Sem permissão' }
+  }
+
+  for (const r of ratings) {
+    if (r.rating !== null && (r.rating < 0 || r.rating > 10)) {
+      return { success: false, error: 'Notas devem estar entre 0 e 10' }
+    }
+    if (r.minutes < 0 || r.minutes > 120) {
+      return { success: false, error: 'Minutos devem estar entre 0 e 120' }
+    }
   }
 
   const rows = ratings.map((r) => ({

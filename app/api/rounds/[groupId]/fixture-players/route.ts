@@ -1,5 +1,5 @@
 // app/api/rounds/[roundId]/fixture-players/route.ts
-// Retorna todos os jogadores das seleções de um fixture + ratings já existentes
+// Retorna todos os jogadores das selecoes de um fixture + ratings ja existentes.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-server'
@@ -8,17 +8,15 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ groupId: string }> }
 ) {
-  // O parâmetro da URL é groupId (por convenção de pasta), mas representa o roundId
   const { groupId: roundId } = await params
   const fixtureId = req.nextUrl.searchParams.get('fixtureId')
 
   if (!fixtureId) {
-    return NextResponse.json({ error: 'fixtureId obrigatório' }, { status: 400 })
+    return NextResponse.json({ error: 'fixtureId obrigatorio' }, { status: 400 })
   }
 
   const admin = supabaseAdmin()
 
-  // Buscar fixture para saber as seleções
   const { data: fixture } = await admin
     .from('fixtures')
     .select('id, home_team, away_team')
@@ -26,10 +24,9 @@ export async function GET(
     .single()
 
   if (!fixture) {
-    return NextResponse.json({ error: 'Fixture não encontrado' }, { status: 404 })
+    return NextResponse.json({ error: 'Fixture nao encontrado' }, { status: 404 })
   }
 
-  // Buscar todos os jogadores das duas seleções
   const { data: players } = await admin
     .from('players')
     .select('id, name, team_name, position')
@@ -44,7 +41,6 @@ export async function GET(
 
   const playerIds = players.map((p: any) => p.id)
 
-  // Buscar ratings já existentes desta rodada para esses jogadores
   const { data: existingRatings } = await admin
     .from('player_round_ratings')
     .select('player_id, rating, minutes')
@@ -56,7 +52,6 @@ export async function GET(
     ratingsMap.set(r.player_id, { rating: r.rating, minutes: r.minutes })
   })
 
-  // Montar resposta com ratings incluídos
   const result = players.map((p: any) => {
     const existing = ratingsMap.get(p.id)
     return {
@@ -69,7 +64,6 @@ export async function GET(
     }
   })
 
-  // Ordenar: time da casa primeiro, depois visitante; dentro de cada time por posição
   const posOrder: Record<string, number> = { GK: 0, ZAG: 1, LAT: 2, MEI: 3, ATK: 4 }
   result.sort((a: any, b: any) => {
     if (a.team_name === fixture.home_team && b.team_name !== fixture.home_team) return -1
