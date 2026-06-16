@@ -32,21 +32,35 @@ export default async function RoundRatingsPage({ params }: PageProps) {
   const groupId = round.group_id
   const groupName = (round.groups as any).name
 
+  const normalizeFixtureTeam = (value: string | null) =>
+    (value ?? '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+
+  const fixturePairKey = (fixture: any) =>
+    [normalizeFixtureTeam(fixture.home_team), normalizeFixtureTeam(fixture.away_team)]
+      .sort()
+      .join('|')
+
   // Fixtures desta rodada com contagem de ratings
-  const { data: fixtures } = await admin
+  const { data: allFixtures } = await admin
     .from('fixtures')
-    .select('id, home_team, away_team, label, status')
+    .select('id, home_team, away_team, label, status, home_goals, away_goals, kickoff')
     .eq('round_id', roundId)
     .order('id', { ascending: true })
 
   // Para cada fixture, contar quantos jogadores têm nota
-  const fixtureIds = (fixtures ?? []).map((f: any) => f.id)
-  const { data: ratingCounts } = fixtureIds.length > 0
+  const allFixtureIds = (allFixtures ?? []).map((f: any) => f.id)
+  const { data: ratingCounts } = allFixtureIds.length > 0
     ? await admin
         .from('player_round_ratings')
         .select('fixture_id')
         .eq('round_id', roundId)
-        .in('fixture_id', fixtureIds)
+        .in('fixture_id', allFixtureIds)
         .not('rating', 'is', null)
     : { data: [] }
 
@@ -55,6 +69,21 @@ export default async function RoundRatingsPage({ params }: PageProps) {
     countByFixture[r.fixture_id] = (countByFixture[r.fixture_id] ?? 0) + 1
   })
 
+  const fixturesByPair = new Map<string, any>()
+  for (const fixture of allFixtures ?? []) {
+    const key = fixturePairKey(fixture)
+    const current = fixturesByPair.get(key)
+    const currentCount = current ? countByFixture[current.id] ?? 0 : -1
+    const fixtureCount = countByFixture[fixture.id] ?? 0
+    const sortId = current?.sort_id ?? fixture.id
+
+    if (!current || fixtureCount > currentCount) {
+      fixturesByPair.set(key, { ...fixture, sort_id: sortId })
+    } else {
+      fixturesByPair.set(key, { ...current, sort_id: sortId })
+    }
+  }
+
   // Total de ratings desta rodada (incluindo sem fixture)
   const { count: totalRated } = await admin
     .from('player_round_ratings')
@@ -62,10 +91,17 @@ export default async function RoundRatingsPage({ params }: PageProps) {
     .eq('round_id', roundId)
     .not('rating', 'is', null)
 
-  const fixturesWithCount = (fixtures ?? []).map((f: any) => ({
-    ...f,
-    ratedCount: countByFixture[f.id] ?? 0,
-  }))
+  const fixturesWithCount = Array.from(fixturesByPair.values())
+    .map((f: any) => ({
+      ...f,
+      ratedCount: countByFixture[f.id] ?? 0,
+    }))
+    .sort((a: any, b: any) => {
+      if (a.kickoff && b.kickoff) {
+        return new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime()
+      }
+      return Number(a.sort_id ?? a.id) - Number(b.sort_id ?? b.id)
+    })
 
   const { data: playerTeams } = await admin
     .from('players')

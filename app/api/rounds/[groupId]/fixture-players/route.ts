@@ -43,13 +43,14 @@ export async function GET(
 
   const { data: existingRatings } = await admin
     .from('player_round_ratings')
-    .select('player_id, rating, minutes')
+    .select('player_id, rating, minutes, lineup_role')
     .eq('round_id', roundId)
+    .eq('fixture_id', fixture.id)
     .in('player_id', playerIds)
 
-  const ratingsMap = new Map<number, { rating: number | null; minutes: number }>()
+  const ratingsMap = new Map<number, { rating: number | null; minutes: number; lineup_role: 'starter' | 'substitute' | null }>()
   existingRatings?.forEach((r: any) => {
-    ratingsMap.set(r.player_id, { rating: r.rating, minutes: r.minutes })
+    ratingsMap.set(r.player_id, { rating: r.rating, minutes: r.minutes, lineup_role: r.lineup_role })
   })
 
   const result = players.map((p: any) => {
@@ -60,7 +61,8 @@ export async function GET(
       team_name: p.team_name,
       position: p.position,
       rating: existing?.rating ?? null,
-      minutes: existing?.minutes ?? 90,
+      minutes: existing?.minutes ?? 0,
+      lineup_role: existing?.lineup_role ?? null,
     }
   })
 

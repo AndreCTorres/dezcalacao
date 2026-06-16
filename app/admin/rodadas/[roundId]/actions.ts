@@ -41,6 +41,20 @@ export async function createManualFixture(
     return { success: false, error: 'Sem permissão' }
   }
 
+  const { data: existingFixtures } = await admin
+    .from('fixtures')
+    .select('id, round_id, home_team, away_team, label, status, home_goals, away_goals, kickoff')
+    .eq('round_id', roundId)
+    .eq('home_team', cleanHome)
+    .eq('away_team', cleanAway)
+    .order('id', { ascending: true })
+    .limit(1)
+
+  const existingFixture = existingFixtures?.[0]
+  if (existingFixture) {
+    return { success: true, fixture: existingFixture, alreadyExists: true }
+  }
+
   // Gerar um ID único para o fixture manual (usa timestamp + random para evitar colisão)
   const manualId = Date.now() * 1000 + Math.floor(Math.random() * 1000)
 
@@ -147,7 +161,7 @@ export async function upsertPlayerRating(
 export async function upsertBatchRatings(
   roundId: string,
   fixtureId: number,
-  ratings: Array<{ playerId: number; rating: number | null; minutes: number }>
+  ratings: Array<{ playerId: number; rating: number | null; minutes: number; lineupRole?: 'starter' | 'substitute' | null }>
 ) {
   const supabase = await createActionClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -175,15 +189,22 @@ export async function upsertBatchRatings(
     }
   }
 
-  const rows = ratings.map((r) => ({
-    player_id: r.playerId,
-    round_id: roundId,
-    fixture_id: fixtureId,
-    rating: r.rating !== null ? parseFloat(r.rating.toFixed(2)) : null,
-    minutes: r.minutes,
-    source: 'manual' as const,
-    fetched_at: new Date().toISOString(),
-  }))
+  const rows = ratings
+    .filter((r) => r.rating !== null)
+    .map((r) => ({
+      player_id: r.playerId,
+      round_id: roundId,
+      fixture_id: fixtureId,
+      rating: parseFloat(r.rating!.toFixed(2)),
+      minutes: r.minutes,
+      lineup_role: r.lineupRole ?? null,
+      source: 'manual' as const,
+      fetched_at: new Date().toISOString(),
+    }))
+
+  if (rows.length === 0) {
+    return { success: false, error: 'Preencha pelo menos uma nota antes de salvar.' }
+  }
 
   const { error } = await admin
     .from('player_round_ratings')
@@ -197,6 +218,49 @@ export async function upsertBatchRatings(
   revalidatePath(`/admin/rodadas/${roundId}`)
   revalidatePath('/app')
   return { success: true, inserted: rows.length }
+}
+
+/**
+ * Atualizar placar de um fixture
+ */
+export async function updateFixtureScore(
+  fixtureId: number,
+  homeGoals: number | null,
+  awayGoals: number | null,
+  roundId: string
+) {
+  const supabase = await createActionClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) return { success: false, error: 'Não autenticado' }
+
+  const admin = supabaseAdmin()
+
+  // Validar permissão (verificar que é admin da rodada)
+  const { data: round } = await admin
+    .from('rounds')
+    .select('id, group_id, groups!inner(admin_id)')
+    .eq('id', roundId)
+    .single()
+
+  if (!round || (round.groups as any).admin_id !== user.id) {
+    return { success: false, error: 'Sem permissão' }
+  }
+
+  const { error } = await admin
+    .from('fixtures')
+    .update({
+      home_goals: homeGoals,
+      away_goals: awayGoals,
+    })
+    .eq('id', fixtureId)
+
+  if (error) {
+    console.error('[Fixtures] Erro ao atualizar placar:', error)
+    return { success: false, error: error.message }
+  }
+
+  revalidatePath(`/admin/rodadas/${roundId}`)
+  return { success: true }
 }
 
 /**

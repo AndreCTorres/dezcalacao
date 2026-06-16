@@ -33,6 +33,12 @@ type TeamPlayerWithRating = {
   }
 }
 
+type RoundRatingResponse = {
+  player_id: number
+  rating: number | null
+  minutes: number
+}
+
 interface RoundDetailsExpandedProps {
   groupId: string
   memberId: string
@@ -116,8 +122,10 @@ export function RoundDetailsExpanded({
         )
 
         if (ratingsRes.ok) {
-          const ratings = await ratingsRes.json()
-          const ratingsMap = new Map(ratings.map((r: any) => [r.player_id, r]))
+          const ratings = await ratingsRes.json() as RoundRatingResponse[]
+          const ratingsMap = new Map<number, RoundRatingResponse>(
+            ratings.map((r) => [r.player_id, r])
+          )
 
           // Merge dos dados
           const enriched = players.map((p: any) => ({

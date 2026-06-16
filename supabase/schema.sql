@@ -80,7 +80,12 @@ create table fixtures (
   home_team text,
   away_team text,
   kickoff timestamptz,
-  status text
+  status text,
+  label text,                        -- Label amigável para exibição manual
+  home_goals int,                    -- Gols do time da casa
+  away_goals int,                    -- Gols do time visitante
+  home_team_id int,                  -- ID do time da casa (API-Football)
+  away_team_id int                   -- ID do time visitante (API-Football)
 );
 
 -- Notas puxadas da API: nota de cada jogador em cada rodada
@@ -91,6 +96,7 @@ create table player_round_ratings (
   fixture_id bigint references fixtures(id),
   rating numeric(4,2),               -- ex.: 8.70 ; null se ainda não saiu
   minutes int default 0,
+  lineup_role text check (lineup_role is null or lineup_role in ('starter', 'substitute')),
   source text default 'api-football',
   fetched_at timestamptz default now(),
   unique (player_id, round_id)

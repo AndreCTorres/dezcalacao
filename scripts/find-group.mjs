@@ -1,7 +1,11 @@
 import { createClient } from '@supabase/supabase-js'
 
-const url = 'https://doynzpekofzfrzhfogkw.supabase.co'
-const key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRveW56cGVrb2Z6ZnJ6aGZvZ2t3Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MTA1NDc2MiwiZXhwIjoyMDk2NjMwNzYyfQ.sVfzDkLJKBaf7AauJY4RkG0TJ_6xX6vz9af06i2g90M'
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+if (!url || !key) {
+  console.error('Faltam NEXT_PUBLIC_SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY')
+  process.exit(1)
+}
 const supabase = createClient(url, key)
 
 const roundId = 'e174fa07-277f-4cc2-a35d-274fcc1fe7ae'
