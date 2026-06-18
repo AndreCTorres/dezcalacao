@@ -12,7 +12,7 @@ import { RoundDetails } from '@/app/app/round-details'
 export default async function ViewMemberPage({
   params,
 }: {
-  params: { memberId: string }
+  params: Promise<{ memberId: string }>
 }) {
   const supabase = await createActionClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -20,6 +20,7 @@ export default async function ViewMemberPage({
   if (!user) redirect('/login')
 
   const admin = supabaseAdmin()
+  const { memberId } = await params
 
   // Buscar o membro alvo
   const { data: targetMember } = await admin
@@ -39,7 +40,7 @@ export default async function ViewMemberPage({
         admin_id
       )
     `)
-    .eq('id', params.memberId)
+    .eq('id', memberId)
     .single()
 
   if (!targetMember || !targetMember.groups) {
@@ -54,6 +55,13 @@ export default async function ViewMemberPage({
   }
 
   const groupMemberId = targetMember.id
+  const membersWithInvertedFullbacks = new Set(['lucas', 'danyel', 'gombas', 'joao', 'pedro'])
+  const normalizedMemberName = targetMember.display_name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+  const lateralSideMode = membersWithInvertedFullbacks.has(normalizedMemberName) ? 'inverted' : 'normal'
 
   // Buscar time do membro alvo
   const { data: teamPlayers } = await admin
@@ -86,25 +94,41 @@ export default async function ViewMemberPage({
     .maybeSingle()
 
   // Ratings da rodada mais recente
+  const normalizeRatingKey = (name?: string | null, teamName?: string | null) =>
+    `${name ?? ''}|${teamName ?? ''}`
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9|]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+
   let ratingsMap: Record<number, number | null> = {}
+  let ratingsByPlayerKey: Record<string, number | null> = {}
   if (latestRound && teamPlayers) {
-    const playerIds = teamPlayers.map((tp: any) => tp.player_id)
     const { data: ratings } = await admin
       .from('player_round_ratings')
-      .select('player_id, rating')
+      .select('player_id, rating, players ( name, team_name )')
       .eq('round_id', latestRound.id)
-      .in('player_id', playerIds)
 
     if (ratings) {
-      for (const r of ratings) {
-        ratingsMap[r.player_id] = r.rating
+      for (const r of ratings as any[]) {
+        if (r.rating != null) {
+          ratingsMap[r.player_id] = r.rating
+        }
+        const ratingPlayer = Array.isArray(r.players) ? r.players[0] : r.players
+        const playerKey = normalizeRatingKey(ratingPlayer?.name, ratingPlayer?.team_name)
+        if (playerKey && r.rating != null) ratingsByPlayerKey[playerKey] = r.rating
       }
     }
   }
 
   const teamWithRatings: PitchPlayer[] = (teamPlayers || []).map((tp: any) => ({
     ...tp,
-    rating: ratingsMap[tp.player_id] ?? null,
+    rating:
+      ratingsMap[tp.player_id] ??
+      ratingsByPlayerKey[normalizeRatingKey(tp.players?.name, tp.players?.team_name)] ??
+      null,
   }))
 
   // Membros do grupo para o ranking
@@ -165,12 +189,12 @@ export default async function ViewMemberPage({
                   href={`/admin/view-member/${m.id}`}
                   className="px-3 py-1.5 rounded-lg text-sm font-medium transition"
                   style={
-                    m.id === params.memberId
+                    m.id === memberId
                       ? { background: 'rgba(197,242,74,.2)', color: '#c5f24a', border: '1px solid rgba(197,242,74,.4)' }
                       : { background: 'rgba(255,255,255,.05)', color: '#8b9690', border: '1px solid rgba(255,255,255,.08)' }
                   }
                 >
-                  {m.id === params.memberId ? '● ' : ''}{m.display_name}
+                  {m.id === memberId ? '● ' : ''}{m.display_name}
                   {m.status !== 'joined' && <span className="ml-1 text-xs opacity-60">(convidado)</span>}
                 </Link>
               ))}
@@ -245,7 +269,11 @@ export default async function ViewMemberPage({
             {/* Grid principal */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
               <div className="lg:col-span-2">
-                <PitchView team={teamWithRatings} />
+                <PitchView
+                  team={teamWithRatings}
+                  memberTeamName={`Time de ${targetMember.display_name}`}
+                  lateralSideMode={lateralSideMode}
+                />
               </div>
               <div className="lg:col-span-1">
                 <ParticipantStandings
@@ -258,12 +286,6 @@ export default async function ViewMemberPage({
 
             {/* Detalhes de Rodadas */}
             <div className="mt-6">
-              <h2
-                className="text-xl font-bold mb-4"
-                style={{ fontFamily: 'Anton, sans-serif', textTransform: 'uppercase', letterSpacing: '1px', color: '#c5f24a' }}
-              >
-                📊 Pontuação por Rodada
-              </h2>
               <RoundDetails groupId={group.id} currentMemberId={groupMemberId} />
             </div>
           </>

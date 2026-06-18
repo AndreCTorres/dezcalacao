@@ -35,7 +35,7 @@ export function ParticipantTeam({ team }: ParticipantTeamProps) {
         <h2 className="text-2xl font-bold text-white">Seu Time</h2>
         {team.length > 0 && (
           <Link
-            href="/app/time"
+            href="#trocas-pos-rodada"
             className="px-4 py-2 bg-lime-500 hover:bg-lime-600 text-gray-900 font-semibold rounded-lg transition text-sm"
           >
             🔄 Substituições

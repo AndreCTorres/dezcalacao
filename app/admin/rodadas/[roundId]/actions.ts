@@ -297,3 +297,37 @@ export async function recalculateRound(groupId: string, roundId: string) {
     return { success: false, error: err.message }
   }
 }
+
+export async function toggleRoundFinalized(roundId: string, finalized: boolean) {
+  const supabase = await createActionClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) return { success: false, error: 'Não autenticado' }
+
+  const admin = supabaseAdmin()
+
+  const { data: round } = await admin
+    .from('rounds')
+    .select('id, group_id, groups!inner(admin_id)')
+    .eq('id', roundId)
+    .single()
+
+  if (!round || (round.groups as any).admin_id !== user.id) {
+    return { success: false, error: 'Sem permissão' }
+  }
+
+  const { error } = await admin
+    .from('rounds')
+    .update({
+      finalized_at: finalized ? new Date().toISOString() : null,
+    })
+    .eq('id', roundId)
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  revalidatePath(`/admin/rodadas/${roundId}`)
+  revalidatePath('/admin/rodadas')
+  revalidatePath('/app')
+  return { success: true }
+}

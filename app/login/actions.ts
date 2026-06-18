@@ -1,39 +1,38 @@
 'use server'
 
-// app/login/actions.ts
-// Server Actions para autenticação.
-
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
-// Login com e-mail + senha (para usuários locais tipo lucas@dezcalacao.local)
-export async function signInWithPassword(email: string, password: string) {
-  const cookieStore = await cookies()
+function getLocalUsername(email: string) {
+  return email.split('@')[0]?.trim().toLowerCase() ?? ''
+}
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-
-  console.log('[Login] Usando Supabase URL:', url?.substring(0, 30) + '...')
-  console.log('[Login] Anon key presente:', !!anonKey)
-
-  const supabase = createServerClient(
-    url,
-    anonKey,
+function createLoginClient(cookieStore: Awaited<ReturnType<typeof cookies>>) {
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() { return cookieStore.getAll() },
+        getAll() {
+          return cookieStore.getAll()
+        },
         setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) => {
               cookieStore.set(name, value, options)
             })
           } catch (e) {
-            console.error('[Login] Erro ao setar cookie:', e)
+            console.error('[Auth] Erro ao setar cookie:', e)
           }
         },
       },
     }
   )
+}
+
+export async function signInWithPassword(email: string, password: string) {
+  const cookieStore = await cookies()
+  const supabase = createLoginClient(cookieStore)
 
   console.log('[Login] Tentando login com senha para:', email)
 
@@ -41,49 +40,50 @@ export async function signInWithPassword(email: string, password: string) {
 
   if (error) {
     console.error('[Login] Erro:', error.message)
-    return { error: 'Usuário ou senha incorretos.' }
+    return { error: 'Usuario ou senha incorretos.' }
   }
 
-  console.log('[Login] ✓ Login com senha OK:', data.user?.email)
-  return { success: true }
+  console.log('[Login] Login com senha OK:', data.user?.email)
+
+  return {
+    success: true,
+    mustChangePassword: getLocalUsername(email) === password.trim().toLowerCase(),
+  }
 }
 
-// Login com magic link (para e-mails reais, ex: admin)
-export async function signInWithEmail(email: string) {
+export async function changeCurrentUserPassword(newPassword: string, confirmPassword: string) {
+  const password = newPassword.trim()
+  const confirmation = confirmPassword.trim()
+
+  if (!password || !confirmation) {
+    return { error: 'Preencha a nova senha e a confirmacao.' }
+  }
+
+  if (password !== confirmation) {
+    return { error: 'As senhas nao conferem.' }
+  }
+
+  if (password.length < 6) {
+    return { error: 'Use pelo menos 6 caracteres.' }
+  }
+
   const cookieStore = await cookies()
+  const supabase = createLoginClient(cookieStore)
+  const { data: { user } } = await supabase.auth.getUser()
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() { return cookieStore.getAll() },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) => {
-              cookieStore.set(name, value, options)
-            })
-          } catch (e) {
-            console.error('[Login] Erro ao setar cookie:', e)
-          }
-        },
-      },
-    }
-  )
+  if (!user?.email) {
+    return { error: 'Sua sessao expirou. Entre novamente.' }
+  }
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
-  const callbackUrl = `${siteUrl}/auth/callback`
+  if (password.toLowerCase() === getLocalUsername(user.email)) {
+    return { error: 'Escolha uma senha diferente da senha inicial.' }
+  }
 
-  console.log('[Login] Enviando magic link para:', email)
-
-  const { error } = await supabase.auth.signInWithOtp({
-    email,
-    options: { emailRedirectTo: callbackUrl },
-  })
+  const { error } = await supabase.auth.updateUser({ password })
 
   if (error) {
-    console.error('[Login] Erro:', error.message)
-    return { error: error.message || 'Erro ao enviar e-mail. Tente novamente.' }
+    console.error('[ChangePassword] Erro:', error.message)
+    return { error: 'Nao foi possivel alterar a senha agora.' }
   }
 
   return { success: true }

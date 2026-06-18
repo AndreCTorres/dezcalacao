@@ -108,6 +108,7 @@ export type Round = {
   name: string
   starts_at?: string
   locked_at?: string
+  finalized_at?: string | null
   status: RoundStatus
   created_at: string
 }

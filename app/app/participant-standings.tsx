@@ -83,13 +83,13 @@ export function ParticipantStandings({ groupId, members, currentMemberId }: Part
   }
 
   return (
-    <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-      <h2 className="text-lg font-bold text-white mb-4">🏆 Ranking</h2>
+    <div className="bg-gray-800 rounded-lg p-3 border border-gray-700 h-full flex flex-col">
+      <h2 className="text-base font-bold text-white mb-2">🏆 Ranking</h2>
 
       {displayStandings.length === 0 ? (
         <p className="text-gray-400 text-sm text-center py-4">Nenhum membro</p>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-1">
           {displayStandings.map((member, idx) => {
             const isCurrent = member.memberId === currentMemberId
             const medal = getMedalEmoji(idx)
@@ -97,14 +97,14 @@ export function ParticipantStandings({ groupId, members, currentMemberId }: Part
             return (
               <div
                 key={member.memberId}
-                className={`flex justify-between items-center p-3 rounded-lg transition ${
+                className={`flex justify-between items-center px-2 py-1.5 rounded-lg transition ${
                   isCurrent ? 'bg-lime-400/20 border border-lime-400 shadow-lg shadow-lime-400/20' : 'bg-gray-700/50 hover:bg-gray-700/70'
                 }`}
               >
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center justify-center w-8">
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-center w-6">
                     {medal ? (
-                      <span className="text-lg">{medal}</span>
+                      <span className="text-base">{medal}</span>
                     ) : (
                       <span className="text-xs font-bold text-gray-500">{idx + 1}º</span>
                     )}
@@ -114,8 +114,8 @@ export function ParticipantStandings({ groupId, members, currentMemberId }: Part
                   </span>
                 </div>
 
-                <div className="flex flex-col items-end">
-                  <span className="font-bold text-lg text-lime-400">{member.totalPoints}</span>
+                <div className="flex flex-col items-end leading-tight">
+                  <span className="font-bold text-base text-lime-400">{member.totalPoints}</span>
                   {member.lastRoundPoints > 0 && (
                     <span className="text-xs text-gray-400">
                       {member.lastRoundPoints > 0 ? '+' : ''}{member.lastRoundPoints} ult.
@@ -128,7 +128,7 @@ export function ParticipantStandings({ groupId, members, currentMemberId }: Part
         </div>
       )}
 
-      <div className="mt-6 pt-6 border-t border-gray-700">
+      <div className="mt-auto pt-3 border-t border-gray-700">
         <div className="flex justify-between items-center">
           <p className="text-xs text-gray-500">
             {loading ? '⏳ Carregando...' : '✓ Atualizado'}

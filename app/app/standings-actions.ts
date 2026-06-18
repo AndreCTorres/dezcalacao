@@ -4,6 +4,7 @@
 // Server Actions para buscar standings (pontuação do grupo)
 
 import { supabaseAdmin } from '@/lib/supabase-server'
+import { getLiveRoundScores } from '@/lib/services/live-score.service'
 
 export type MemberStanding = {
   memberId: string
@@ -16,70 +17,30 @@ export async function getGroupStandingsWithRounds(groupId: string) {
   const admin = supabaseAdmin()
 
   try {
-    // 1. Buscar todas as rodadas do grupo para contexto
-    const { data: rounds } = await admin
-      .from('rounds')
-      .select('id, name, status')
-      .eq('group_id', groupId)
-      .order('created_at', { ascending: false })
+    const rounds = await getLiveRoundScores(admin, groupId)
 
-    if (!rounds) {
+    if (rounds.length === 0) {
       return { success: false, error: 'Nenhuma rodada encontrada', standings: [] }
     }
 
-    // 2. Buscar scores de todas as rodadas
-    const { data: scores } = await admin
-      .from('round_scores')
-      .select(
-        `
-        id,
-        group_member_id,
-        round_id,
-        total_points,
-        group_members (
-          id,
-          display_name
-        ),
-        rounds (
-          id,
-          group_id
-        )
-      `
-      )
-
-    if (!scores) {
-      return { success: false, error: 'Erro ao buscar scores', standings: [] }
-    }
-
-    // 3. Filtrar scores apenas do grupo especificado
-    const groupScores = scores.filter((s: any) => s.rounds?.group_id === groupId)
-
-    // 4. Agrupar por membro e calcular totais
     const memberScores = new Map<string, { name: string; total: number; lastRound: number }>()
 
-    groupScores.forEach((score: any) => {
-      const memberId = score.group_member_id
-      const memberName = score.group_members?.display_name || 'Desconhecido'
-      const points = score.total_points || 0
+    rounds.forEach((round) => {
+      round.scores.forEach((score) => {
+        if (!memberScores.has(score.memberId)) {
+          memberScores.set(score.memberId, {
+            name: score.memberName,
+            total: 0,
+            lastRound: 0,
+          })
+        }
 
-      if (!memberScores.has(memberId)) {
-        memberScores.set(memberId, {
-          name: memberName,
-          total: 0,
-          lastRound: 0,
-        })
-      }
-
-      const current = memberScores.get(memberId)!
-      current.total += points
-
-      // Pegar o score mais recente (da rodada mais recente)
-      if (current.lastRound === 0 || groupScores.indexOf(score) === 0) {
-        current.lastRound = points
-      }
+        const current = memberScores.get(score.memberId)!
+        current.total += score.points
+        if (current.lastRound === 0) current.lastRound = score.points
+      })
     })
 
-    // 5. Converter para array e ordenar
     const standings: MemberStanding[] = Array.from(memberScores.entries())
       .map(([memberId, data]) => ({
         memberId,
@@ -93,7 +54,7 @@ export async function getGroupStandingsWithRounds(groupId: string) {
       success: true,
       standings,
       roundCount: rounds.length,
-      lastRound: rounds[0],
+      lastRound: rounds[0] ? { id: rounds[0].roundId, name: rounds[0].roundName, status: rounds[0].status } : null,
     }
   } catch (error: any) {
     console.error('[Standings] Erro:', error.message)

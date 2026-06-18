@@ -65,14 +65,14 @@ export function RoundDetails({ groupId, currentMemberId }: RoundDetailsProps) {
   }
 
   return (
-    <div>
+    <div className="h-full flex flex-col">
       <h2
         className="text-lg font-bold text-lime-400 mb-3"
         style={{ fontFamily: 'Anton, sans-serif', textTransform: 'uppercase', letterSpacing: '1px' }}
       >
         📊 Pontuação por Rodadas
       </h2>
-      <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
+      <div className="space-y-3 overflow-y-auto pr-2 flex-1">
         {rounds.map((round) => {
           // Encontra o score do membro atual
           const currentScore = round.scores.find(s => s.memberId === currentMemberId)

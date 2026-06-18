@@ -26,6 +26,7 @@ export type PitchPlayer = {
 type PitchViewProps = {
   team: PitchPlayer[]
   memberTeamName?: string | null
+  lateralSideMode?: 'normal' | 'inverted'
 }
 
 // Cores por posição
@@ -45,20 +46,13 @@ const POSITION_BADGE_COLORS: Record<string, string> = {
   ATK: 'bg-red-500 text-white',
 }
 
-function getRatingColor(rating: number | null | undefined): string {
-  if (rating == null) return 'text-gray-400'
-  if (rating >= 8) return 'text-yellow-400'
-  if (rating >= 7) return 'text-lime-400'
-  if (rating >= 6) return 'text-white'
-  return 'text-red-400'
-}
-
-function getRatingBg(rating: number | null | undefined): string {
-  if (rating == null) return 'bg-gray-700/80'
-  if (rating >= 8) return 'bg-yellow-500/20 ring-1 ring-yellow-400/50'
-  if (rating >= 7) return 'bg-lime-500/20 ring-1 ring-lime-400/50'
-  if (rating >= 6) return 'bg-white/10'
-  return 'bg-red-500/20 ring-1 ring-red-400/50'
+function getRatingBadgeClass(rating: number | null | undefined): string {
+  if (rating == null) return 'bg-black/40 text-gray-300 border-white/10'
+  if (rating >= 8) return 'bg-yellow-400 text-gray-950 border-yellow-200/70'
+  if (rating >= 7) return 'bg-lime-400 text-gray-950 border-lime-200/70'
+  if (rating >= 6) return 'bg-white/90 text-gray-950 border-white/70'
+  if (rating >= 5) return 'bg-orange-500 text-white border-orange-300/70'
+  return 'bg-red-600 text-white border-red-300/70'
 }
 
 // Pega o sobrenome ou nome curto, priorizando nomes compostos
@@ -80,8 +74,17 @@ function shortName(fullName: string): string {
   return last
 }
 
-function PlayerToken({ player, size = 'md' }: { player: PitchPlayer; size?: 'sm' | 'md' }) {
+function PlayerToken({
+  player,
+  size = 'md',
+  displayPosition,
+}: {
+  player: PitchPlayer
+  size?: 'sm' | 'md'
+  displayPosition?: string
+}) {
   const pos = player.position_slot as string
+  const positionLabel = displayPosition ?? pos
   const colorGrad = POSITION_COLORS[pos] || 'from-gray-500 to-gray-700'
   const badgeColor = POSITION_BADGE_COLORS[pos] || 'bg-gray-500 text-white'
   const rating = player.rating
@@ -92,11 +95,6 @@ function PlayerToken({ player, size = 'md' }: { player: PitchPlayer; size?: 'sm'
     <div className={`flex flex-col items-center gap-1 ${isSmall ? 'w-14' : 'w-[68px]'}`}>
       {/* Foto / avatar */}
       <div className={`relative ${isSmall ? 'w-11 h-11' : 'w-14 h-14'}`}>
-        {/* Ring de rating — só aparece quando tem nota */}
-        {rating != null && (
-          <div className={`absolute inset-0 rounded-full ${getRatingBg(rating)} pointer-events-none`} />
-        )}
-
         <div className={`
           w-full h-full rounded-full overflow-hidden border-2
           ${hasPhoto ? 'bg-gray-800' : `bg-gradient-to-b ${colorGrad}`}
@@ -124,7 +122,7 @@ function PlayerToken({ player, size = 'md' }: { player: PitchPlayer; size?: 'sm'
           text-[9px] font-black px-1.5 py-0.5 rounded-sm leading-none
           whitespace-nowrap shadow-lg
         `}>
-          {pos}
+          {positionLabel}
         </span>
       </div>
 
@@ -139,9 +137,10 @@ function PlayerToken({ player, size = 'md' }: { player: PitchPlayer; size?: 'sm'
 
       {/* Nota */}
       <span className={`
-        font-mono font-bold leading-none
+        min-w-8 rounded-full border px-1.5 py-0.5 text-center
+        font-mono font-black leading-none shadow-[0_1px_6px_rgba(0,0,0,0.45)]
         ${isSmall ? 'text-[10px]' : 'text-xs'}
-        ${getRatingColor(rating)}
+        ${getRatingBadgeClass(rating)}
       `}>
         {rating != null ? rating.toFixed(1) : '—'}
       </span>
@@ -160,14 +159,15 @@ const ROW_TOP: Record<string, string> = {
   GK:  '88%',
 }
 
-export function PitchView({ team, memberTeamName }: PitchViewProps) {
+export function PitchView({ team, memberTeamName, lateralSideMode = 'normal' }: PitchViewProps) {
   const starters = team.filter(t => t.slot === 'starter')
   const bench = team.filter(t => t.slot === 'bench')
 
   const byPos = (pos: string) => starters.filter(p => p.position_slot === pos)
   const gks  = byPos('GK')
   const zags = byPos('ZAG')
-  const lats = byPos('LAT')
+  const latsByDraftOrder = byPos('LAT').sort((a, b) => a.id.localeCompare(b.id))
+  const lats = lateralSideMode === 'inverted' ? latsByDraftOrder.reverse() : latsByDraftOrder
   const meis = byPos('MEI')
   const atks = byPos('ATK')
 
@@ -175,6 +175,14 @@ export function PitchView({ team, memberTeamName }: PitchViewProps) {
     .filter(p => p.rating != null)
     .reduce((sum, p) => sum + (p.rating ?? 0), 0)
   const hasRatings = starters.some(p => p.rating != null)
+
+  function scrollToPostRoundSwaps(event: React.MouseEvent<HTMLAnchorElement>) {
+    event.preventDefault()
+    document.getElementById('trocas-pos-rodada')?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    })
+  }
 
   // Renderiza uma linha de jogadores com posicionamento absoluto
   // players: array de jogadores
@@ -184,10 +192,12 @@ export function PitchView({ team, memberTeamName }: PitchViewProps) {
     players,
     top,
     spread = 'center',
+    positionLabels,
   }: {
     players: PitchPlayer[]
     top: string
     spread?: 'center' | 'wide' | 'full' | 'tight' | 'tight-lat'
+    positionLabels?: string[]
   }) {
     if (players.length === 0) return null
 
@@ -230,24 +240,26 @@ export function PitchView({ team, memberTeamName }: PitchViewProps) {
             className="absolute -translate-x-1/2 -translate-y-1/2"
             style={{ left: positions[i], top }}
           >
-            <PlayerToken player={p} />
+            <PlayerToken player={p} displayPosition={positionLabels?.[i]} />
           </div>
         ))}
       </>
     )
   }
 
+  const lateralLabels = lats.length === 2 ? ['LE', 'LD'] : undefined
+
   return (
-    <div className="space-y-4 h-full">
+    <div className="w-full h-full flex flex-col">
       {/* Card do campinho + banco em layout horizontal */}
-      <div className="flex gap-4 h-full">
+      <div className="flex gap-4 items-stretch flex-1">
         {/* BANCO DE RESERVAS À ESQUERDA */}
         {bench.length > 0 && (
-          <div className="bg-gray-900/80 rounded-xl border border-white/10 p-4 flex flex-col items-center justify-start w-32 h-full">
-            <h3 className="text-gray-400 text-[9px] font-bold uppercase tracking-widest mb-4 text-center leading-tight">
+          <div className="bg-gray-900/80 rounded-xl border border-white/10 p-4 flex flex-col items-center w-32 h-full">
+            <h3 className="text-gray-400 text-sm font-bold uppercase tracking-widest mb-4 text-center leading-tight">
               🪑 Banco
             </h3>
-            <div className="flex flex-col gap-3 items-center w-full flex-1">
+            <div className="flex flex-col gap-4 items-center w-full justify-center flex-1">
               {[...bench]
                 .sort((a, b) => {
                   const order = ['GK', 'ZAG', 'LAT', 'MEI', 'ATK']
@@ -263,17 +275,14 @@ export function PitchView({ team, memberTeamName }: PitchViewProps) {
         )}
 
         {/* Campinho principal */}
-        <div className="flex-1 relative rounded-2xl overflow-hidden border border-white/10 shadow-2xl bg-[#0d1a0f] flex flex-col h-full">
+        <div className="flex-1 relative rounded-2xl overflow-hidden border border-white/10 shadow-2xl bg-[#0d1a0f] flex flex-col">
 
           {/* Cabeçalho */}
           <div className="flex justify-between items-center px-6 py-4 bg-black/40 border-b border-white/10">
             <div>
               <h2 className="text-white font-bold text-lg tracking-tight">
-                {memberTeamName ? `⚽ ${memberTeamName}` : 'Meu Time'}
+                {memberTeamName ? `⚽ ${memberTeamName}` : '⚽ Meu Time'}
               </h2>
-              {!memberTeamName && (
-                <p className="text-xs text-gray-400 mt-1">Aguardando draft...</p>
-              )}
             </div>
             <div className="flex items-center gap-2">
               {hasRatings && (
@@ -286,7 +295,8 @@ export function PitchView({ team, memberTeamName }: PitchViewProps) {
               )}
               {team.length > 0 && (
                 <Link
-                  href="/app/time"
+                  href="#trocas-pos-rodada"
+                  onClick={scrollToPostRoundSwaps}
                   className="px-3 py-1.5 bg-lime-500 hover:bg-lime-400 text-gray-900 font-bold rounded-full transition text-xs flex items-center gap-1"
                 >
                   🔄 Subs
@@ -303,7 +313,7 @@ export function PitchView({ team, memberTeamName }: PitchViewProps) {
                 <p>Seu time ainda não foi definido. Aguarde o draft!</p>
               </div>
             ) : (
-              <div className="relative w-full flex-1 select-none">
+              <div className="relative w-full aspect-[3/4] max-h-[560px] select-none">
                 {/* Grama + linhas */}
                 <FieldBackground />
 
@@ -316,7 +326,7 @@ export function PitchView({ team, memberTeamName }: PitchViewProps) {
                   <FieldRow players={meis} top={ROW_TOP.MEI} spread="center" />
 
                   {/* LAT: 2 laterais — nas extremidades */}
-                  <FieldRow players={lats} top={ROW_TOP.LAT} spread="tight-lat" />
+                  <FieldRow players={lats} top={ROW_TOP.LAT} spread="tight-lat" positionLabels={lateralLabels} />
 
                   {/* ZAG: 2 zagueiros — centrais, mais juntos */}
                   <FieldRow players={zags} top={ROW_TOP.ZAG} spread="tight" />

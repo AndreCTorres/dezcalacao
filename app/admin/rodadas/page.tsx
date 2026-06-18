@@ -30,12 +30,23 @@ export default async function RoundsPage() {
     redirect('/admin')
   }
 
-  // Buscar rodadas
-  const { data: rounds } = await admin
+  // Buscar rodadas. Se a base local ainda nao recebeu a migracao do finalized_at,
+  // faz fallback sem a coluna para nao esconder o historico de jogos/rodadas.
+  let { data: rounds, error: roundsError } = await admin
     .from('rounds')
-    .select('id, name, status, starts_at, locked_at, ends_at, fixtures_done, fixtures_total, auto_close, created_at')
+    .select('id, name, status, starts_at, locked_at, finalized_at, ends_at, fixtures_done, fixtures_total, auto_close, created_at')
     .eq('group_id', group.id)
     .order('created_at', { ascending: false })
+
+  if (roundsError) {
+    const fallback = await admin
+      .from('rounds')
+      .select('id, name, status, starts_at, locked_at, ends_at, fixtures_done, fixtures_total, auto_close, created_at')
+      .eq('group_id', group.id)
+      .order('created_at', { ascending: false })
+
+    rounds = (fallback.data ?? []).map((round: any) => ({ ...round, finalized_at: null }))
+  }
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-8">

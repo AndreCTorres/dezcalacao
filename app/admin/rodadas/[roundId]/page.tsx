@@ -6,6 +6,8 @@ import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { LogoutButton } from '@/app/components/logout-button'
 import { RoundRatingsManager } from './round-ratings-manager'
+import { RoundFinalizationToggle } from './round-finalization-toggle'
+import { RoundStatusActions } from './round-status-actions'
 
 interface PageProps {
   params: Promise<{ roundId: string }>
@@ -20,11 +22,23 @@ export default async function RoundRatingsPage({ params }: PageProps) {
 
   const admin = supabaseAdmin()
 
-  const { data: round } = await admin
+  let { data: round, error: roundError } = await admin
     .from('rounds')
-    .select('id, name, status, group_id, groups!inner(id, name, admin_id)')
+    .select('id, name, status, finalized_at, group_id, groups!inner(id, name, admin_id)')
     .eq('id', roundId)
     .single()
+
+  const hasFinalizationColumn = !roundError
+
+  if (roundError) {
+    const fallback = await admin
+      .from('rounds')
+      .select('id, name, status, group_id, groups!inner(id, name, admin_id)')
+      .eq('id', roundId)
+      .single()
+
+    round = fallback.data ? { ...fallback.data, finalized_at: null } : null
+  }
 
   if (!round) notFound()
   if ((round.groups as any).admin_id !== user.id) redirect('/admin')
@@ -136,12 +150,16 @@ export default async function RoundRatingsPage({ params }: PageProps) {
             }`}>
               {round.status === 'scored' ? '✅ Pontuada' : round.status === 'open' ? '🟢 Aberta' : '🔒 Travada'}
             </span>
+            {hasFinalizationColumn && (
+              <RoundFinalizationToggle roundId={roundId} finalizedAt={(round as any).finalized_at ?? null} />
+            )}
             <span className="text-xs text-gray-400">
               {totalRated ?? 0} jogadores com nota inserida
             </span>
             <span className="text-xs text-gray-400">
               {fixturesWithCount.length} {fixturesWithCount.length === 1 ? 'jogo' : 'jogos'} nesta rodada
             </span>
+            <RoundStatusActions groupId={groupId} roundId={roundId} status={round.status} />
           </div>
         </div>
 

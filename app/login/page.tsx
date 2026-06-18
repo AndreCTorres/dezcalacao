@@ -1,6 +1,5 @@
 // app/login/page.tsx
-// Página de login com magic link (e-mail).
-// UI em português, fundo escuro com acento verde-limão.
+// Página de login com usuário + senha.
 
 import { LoginForm } from './login-form'
 
@@ -13,9 +12,9 @@ export default async function LoginPage({
   let errorMessage = ''
   
   if (params.error === 'auth_failed') {
-    errorMessage = 'Falha na autenticação. Tente solicitar um novo link.'
+    errorMessage = 'Falha na autenticação. Tente novamente.'
   } else if (params.error === 'confirm_failed') {
-    errorMessage = 'Link inválido ou expirado. Solicite um novo.'
+    errorMessage = 'Sessão inválida ou expirada. Faça login novamente.'
   }
 
   return (
@@ -66,7 +65,7 @@ export default async function LoginPage({
         </div>
 
         <p className="text-center text-xs mt-6" style={{ color: '#5d6661' }}>
-          Sem senha. Sem cadastro. Só clica no link que chega no seu e-mail.
+          Use o usuário e a senha que o admin criou pra você.
         </p>
       </div>
     </div>

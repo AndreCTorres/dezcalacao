@@ -69,6 +69,7 @@ create table rounds (
   name text not null,                -- 'Rodada 1', 'Oitavas', etc.
   starts_at timestamptz,
   locked_at timestamptz,             -- quando travou pra substituições
+  finalized_at timestamptz,          -- quando o admin marcou como concluída para consulta
   status text not null default 'open', -- 'open' | 'locked' | 'scored'
   created_at timestamptz default now()
 );

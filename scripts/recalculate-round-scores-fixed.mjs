@@ -64,6 +64,21 @@ async function calculateRoundScores() {
           continue
         }
 
+        const { data: substitutions } = await supabase
+          .from('substitutions')
+          .select('out_player_id, in_player_id')
+          .eq('group_member_id', member.id)
+          .eq('round_id', ROUND_ID)
+
+        const { data: postRoundSwaps } = await supabase
+          .from('post_round_swaps')
+          .select('out_player_id, in_player_id')
+          .eq('group_member_id', member.id)
+          .eq('round_id', ROUND_ID)
+
+        const substitutionsMap = new Map((substitutions || []).map(s => [s.out_player_id, s.in_player_id]))
+        const postRoundSwapsMap = new Map((postRoundSwaps || []).map(s => [s.out_player_id, s.in_player_id]))
+
         // Calcular score dos 11 titulares (slot='starter')
         let totalScore = 0
         let playersScored = 0
@@ -71,12 +86,15 @@ async function calculateRoundScores() {
         for (const player of draft) {
           if (player.slot !== 'starter') continue // Só conta titulares
 
-          const rating = ratings.find(r => r.player_id === player.player_id)
-          if (!rating || !rating.rating) continue
+          const preSubPlayerId = substitutionsMap.get(player.player_id) ?? player.player_id
+          const effectivePlayerId = postRoundSwapsMap.get(preSubPlayerId) ?? preSubPlayerId
+          const rating = ratings.find(r => r.player_id === effectivePlayerId)
+          const playerRating = Number(rating?.rating)
+          if (!Number.isFinite(playerRating)) continue
 
           // Só considera quem jogou mais de 20 minutos
           if (rating.minutes >= 20) {
-            totalScore += parseFloat(rating.rating)
+            totalScore += playerRating
             playersScored++
           }
         }
@@ -86,8 +104,8 @@ async function calculateRoundScores() {
           continue
         }
 
-        // Média
-        const avgScore = (totalScore / playersScored).toFixed(2)
+        // Soma das notas dos titulares validos
+        const roundScore = totalScore.toFixed(2)
 
         // Upsert no round_scores
         // Schema: group_member_id, round_id, base_points, bonus_points, total_points
@@ -97,16 +115,16 @@ async function calculateRoundScores() {
             {
               group_member_id: member.id,
               round_id: ROUND_ID,
-              base_points: parseFloat(avgScore),
+              base_points: parseFloat(roundScore),
               bonus_points: 0,
-              total_points: parseFloat(avgScore),
+              total_points: parseFloat(roundScore),
               computed_at: new Date().toISOString(),
             },
             { onConflict: 'group_member_id,round_id' }
           )
 
         if (!scoreError) {
-          console.log(`    ✓ ${avgScore} pts (${playersScored} titulares)`)
+          console.log(`    ✓ ${roundScore} pts (${playersScored} titulares)`)
           totalMembersScored++
         } else {
           console.log(`    ❌ ${scoreError.message}`)

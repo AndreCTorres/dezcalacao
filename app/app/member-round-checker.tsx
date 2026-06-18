@@ -54,13 +54,13 @@ export function MemberRoundChecker({ data, onClose }: MemberRoundCheckerProps) {
   const stats = useMemo(() => {
     const allPlayers = [...data.starters, ...data.bench]
     const withRating = allPlayers.filter(p => p.rating != null)
+    const scoringStarters = data.starters.filter(p => p.rating != null && (p.minutes ?? 0) >= 20)
     const effectiveCount = data.starters.length + (data.substitutions?.length || 0)
 
     return {
       totalPlayers: allPlayers.length,
       withRating: withRating.length,
-      totalRating: withRating.reduce((sum, p) => sum + (p.rating ?? 0), 0),
-      avgRating: withRating.length > 0 ? withRating.reduce((sum, p) => sum + (p.rating ?? 0), 0) / withRating.length : 0,
+      scoreTotal: scoringStarters.reduce((sum, p) => sum + (p.rating ?? 0), 0),
       completionPercent: (withRating.length / effectiveCount) * 100,
     }
   }, [data])
@@ -95,9 +95,9 @@ export function MemberRoundChecker({ data, onClose }: MemberRoundCheckerProps) {
         </div>
 
         <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
-          <p className="text-xs text-yellow-400 font-bold uppercase">Média</p>
+          <p className="text-xs text-yellow-400 font-bold uppercase">Total</p>
           <p className="text-2xl font-bold text-yellow-400 mt-1">
-            {stats.avgRating.toFixed(2)}
+            {stats.scoreTotal.toFixed(2)}
           </p>
           <p className="text-xs text-gray-500 mt-1">pts</p>
         </div>

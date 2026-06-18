@@ -103,3 +103,76 @@ export function bonusPoints(
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
+
+// ============================================================================
+// Seleção da Rodada (Team of the Round) — XI 4-3-3 com as maiores notas
+// ============================================================================
+
+// Formação do XI da rodada: 1 GK | 4 DEF | 3 MEI | 3 ATK = 11 (4-3-3)
+// IMPORTANTE: a linha de defesa combina ZAG e LAT num único grupo de 4. Isso é
+// necessário porque, na importação da API, todos os defensores ("Defender") entram
+// como ZAG — não há LAT no cadastro do jogador. Combinando, a defesa sempre preenche.
+export const TOTR_LINES = {
+  GK: { positions: ['GK'] as Position[], count: 1 },
+  DEF: { positions: ['ZAG', 'LAT'] as Position[], count: 4 },
+  MEI: { positions: ['MEI'] as Position[], count: 3 },
+  ATK: { positions: ['ATK'] as Position[], count: 3 },
+}
+
+export type TotrLine = 'GK' | 'DEF' | 'MEI' | 'ATK'
+
+// Mantido por compatibilidade (não é mais a fonte da formação)
+export const TOTR_FORMATION: Record<Position, number> = {
+  GK: 1,
+  ZAG: 2,
+  LAT: 2,
+  MEI: 3,
+  ATK: 3,
+};
+
+// Shape mínimo necessário para escolher o XI. T pode carregar dados extras
+// (nome, foto, seleção) que serão preservados no retorno para renderização.
+export interface RatedForTotr {
+  position: Position;
+  rating: number | null;
+  minutes: number;
+}
+
+export interface TeamOfTheRound<T extends RatedForTotr> {
+  lines: Record<TotrLine, T[]>; // escolhidos por linha (já ordenados)
+  starters: T[];                // os 11, na ordem GK→ATK
+  best: T | null;               // craque da rodada (maior nota geral)
+}
+
+// Escolhe o XI da rodada a partir de TODAS as notas da rodada.
+// Determinístico: ordena por nota (desc) e, em empate, por minutos (desc).
+// Considera apenas quem tem nota e jogou o mínimo de minutos.
+export function pickTeamOfRound<T extends RatedForTotr>(
+  players: T[],
+  minMinutes = 20
+): TeamOfTheRound<T> {
+  const eligible = players.filter(
+    (p) => p.rating != null && p.minutes >= minMinutes
+  );
+
+  const sortByRating = (a: T, b: T) =>
+    b.rating! - a.rating! || b.minutes - a.minutes;
+
+  const lines = {} as Record<TotrLine, T[]>;
+  const starters: T[] = [];
+
+  (Object.keys(TOTR_LINES) as TotrLine[]).forEach((line) => {
+    const { positions, count } = TOTR_LINES[line];
+    const pool = eligible
+      .filter((p) => positions.includes(p.position))
+      .sort(sortByRating)
+      .slice(0, count);
+    lines[line] = pool;
+    starters.push(...pool);
+  });
+
+  // Craque da rodada: maior nota entre todos os elegíveis (não só o XI).
+  const best = eligible.slice().sort(sortByRating)[0] ?? null;
+
+  return { lines, starters, best };
+}

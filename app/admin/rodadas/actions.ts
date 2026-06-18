@@ -5,7 +5,6 @@
 
 import { createActionClient, supabaseAdmin } from '@/lib/supabase-server'
 import { revalidatePath } from 'next/cache'
-import { getFixtures, getPlayerStats } from '@/lib/apiFootball'
 import { calculateRoundScores } from '@/lib/services/scoring.service'
 
 export async function createRound(groupId: string, name: string, startsAt?: string) {
@@ -93,68 +92,24 @@ export async function closeRound(groupId: string, roundId: string) {
     console.log(`[Rounds] Fechando rodada: ${round.name}`)
 
     // ========================================
-    // PASSO 1: Buscar fixtures (jogos) da Copa 2026
+    // FONTE DAS NOTAS: ENTRADA MANUAL
     // ========================================
-    console.log('[Rounds] Passo 1: Buscando fixtures da Copa...')
-    let fixtures: any[] = []
-    try {
-      fixtures = await getFixtures()
-      console.log(`[Rounds] ✓ ${fixtures.length} fixtures encontrados`)
-    } catch (error: any) {
-      console.warn('[Rounds] ⚠️ Erro ao buscar fixtures:', error.message)
-      // Continuar mesmo se falhar — ratings podem estar vazios
-    }
+    // As notas (rating + minutos) são inseridas pelo admin na tela de ratings
+    // da rodada (source: 'manual'), ANTES de fechar. Fechar a rodada apenas
+    // calcula a pontuação a partir das notas já gravadas em player_round_ratings.
+    // (A sincronização automática via API-Football foi desativada — usamos notas
+    //  manuais. Se um dia quiser religar a API, ela vive nas rotas opcionais de
+    //  sync, e não deve sobrescrever notas com source 'manual'.)
+    console.log('[Rounds] Notas vêm da entrada manual — sem chamada à API.')
 
-    // ========================================
-    // PASSO 2: Para cada fixture, buscar ratings dos jogadores
-    // ========================================
-    console.log('[Rounds] Passo 2: Buscando ratings dos jogadores...')
-    let ratingsInserted = 0
-    let ratingsErrors = 0
+    // Conferir quantas notas manuais já existem para esta rodada (diagnóstico)
+    const { count: ratingsCount } = await admin
+      .from('player_round_ratings')
+      .select('id', { count: 'exact', head: true })
+      .eq('round_id', roundId)
 
-    for (const fixture of fixtures) {
-      try {
-        const playerStats = await getPlayerStats(fixture.fixture.id)
-
-        // playerStats é um array de jogadores com ratings
-        for (const statLine of playerStats) {
-          const team = statLine.team
-          const players = statLine.players || []
-
-          for (const playerData of players) {
-            const player = playerData.player
-            const stats = playerData.statistics?.[0] // primeira estatística (pode ser 0 se não jogou)
-
-            // Inserir/atualizar rating
-            const { error: ratingError } = await admin
-              .from('player_round_ratings')
-              .upsert(
-                {
-                  player_id: player.id,
-                  round_id: roundId,
-                  fixture_id: fixture.fixture.id,
-                  rating: stats?.rating ? parseFloat(stats.rating) : null,
-                  minutes: stats?.minutes || 0,
-                  source: 'api-football',
-                  fetched_at: new Date().toISOString(),
-                },
-                { onConflict: 'player_id,round_id' }
-              )
-
-            if (ratingError) {
-              ratingsErrors++
-            } else {
-              ratingsInserted++
-            }
-          }
-        }
-      } catch (error: any) {
-        console.warn(`[Rounds] ⚠️ Erro ao buscar ratings do fixture ${fixture.fixture.id}:`, error.message)
-        ratingsErrors++
-      }
-    }
-
-    console.log(`[Rounds] ✓ Ratings inseridos: ${ratingsInserted}, Erros: ${ratingsErrors}`)
+    const ratingsInserted = ratingsCount || 0
+    console.log(`[Rounds] ✓ ${ratingsInserted} notas encontradas para a rodada`)
 
     // ========================================
     // PASSO 3: Calcular pontuação de todos os membros (com transação implícita)
@@ -202,10 +157,9 @@ export async function closeRound(groupId: string, roundId: string) {
 
     return {
       success: true,
-      message: `✅ Rodada fechada com sucesso! ${ratingsInserted} ratings processados, ${scoreResult.count} membros pontuados.`,
+      message: `✅ Rodada fechada com sucesso! ${ratingsInserted} notas consideradas, ${scoreResult.count} membros pontuados.`,
       stats: {
         ratingsInserted,
-        ratingsErrors,
         membrosCalculados: scoreResult.count,
       },
     }
@@ -217,6 +171,59 @@ export async function closeRound(groupId: string, roundId: string) {
       error: `❌ ERRO: ${error.message || 'Erro desconhecido ao fechar rodada'}\n\nA rodada NÃO foi marcada como concluída. Tente novamente ou contacte suporte.`,
     }
   }
+}
+
+export async function reopenRound(groupId: string, roundId: string) {
+  const supabase = await createActionClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    return { success: false, error: 'Não autenticado' }
+  }
+
+  const admin = supabaseAdmin()
+  const { data: group } = await admin
+    .from('groups')
+    .select('id')
+    .eq('id', groupId)
+    .eq('admin_id', user.id)
+    .single()
+
+  if (!group) {
+    return { success: false, error: 'Você não é admin deste grupo' }
+  }
+
+  let { error } = await admin
+    .from('rounds')
+    .update({
+      status: 'open',
+      locked_at: null,
+      finalized_at: null,
+    })
+    .eq('id', roundId)
+    .eq('group_id', groupId)
+
+  if (error) {
+    const fallback = await admin
+      .from('rounds')
+      .update({
+        status: 'open',
+        locked_at: null,
+      })
+      .eq('id', roundId)
+      .eq('group_id', groupId)
+
+    error = fallback.error
+  }
+
+  if (error) {
+    return { success: false, error: `Erro ao reabrir rodada: ${error.message}` }
+  }
+
+  revalidatePath('/admin/rodadas')
+  revalidatePath('/app')
+
+  return { success: true }
 }
 
 export async function getRoundsForGroup(groupId: string) {

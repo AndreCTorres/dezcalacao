@@ -2,6 +2,7 @@
 // Buscar detalhes de pontuação por rodada
 
 import { supabaseAdmin } from '@/lib/supabase-server'
+import { getLiveRoundScores } from '@/lib/services/live-score.service'
 import { NextResponse } from 'next/server'
 
 export async function GET(
@@ -12,49 +13,14 @@ export async function GET(
     const { groupId } = await params
     const admin = supabaseAdmin()
 
-    // 1. Buscar rodadas do grupo (ordenadas mais recentes primeiro)
-    const { data: rounds, error: roundsError } = await admin
-      .from('rounds')
-      .select('id, name, status')
-      .eq('group_id', groupId)
-      .order('created_at', { ascending: false })
+    const roundDetails = await getLiveRoundScores(admin, groupId)
 
-    if (roundsError || !rounds) {
+    if (roundDetails.length === 0) {
       return NextResponse.json(
         { error: 'Erro ao buscar rodadas', rounds: [] },
         { status: 400 }
       )
     }
-
-    // 2. Para cada rodada, buscar scores
-    const roundDetails = await Promise.all(
-      rounds.map(async (round) => {
-        const { data: scores } = await admin
-          .from('round_scores')
-          .select(
-            `
-            group_member_id,
-            total_points,
-            group_members (
-              display_name
-            )
-          `
-          )
-          .eq('round_id', round.id)
-          .order('total_points', { ascending: false })
-
-        return {
-          roundId: round.id,
-          roundName: round.name,
-          status: round.status,
-          scores: (scores || []).map((s: any) => ({
-            memberId: s.group_member_id,
-            memberName: s.group_members?.display_name || 'Desconhecido',
-            points: s.total_points || 0,
-          })),
-        }
-      })
-    )
 
     return NextResponse.json({ rounds: roundDetails })
   } catch (error: any) {

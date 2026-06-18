@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { signInWithPassword, signInWithEmail } from './actions'
+import { signInWithPassword } from './actions'
 
 export function LoginForm() {
   const router = useRouter()
@@ -40,7 +40,7 @@ export function LoginForm() {
     }
 
     // Sucesso — redireciona para /app (participante) ou /admin (admin)
-    router.push('/admin')
+    router.push(result.mustChangePassword ? '/login/change-password' : '/admin')
     router.refresh()
   }
 

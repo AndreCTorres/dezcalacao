@@ -209,8 +209,8 @@ export function ExampleRoundChecker() {
           </div>
 
           <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 space-y-2">
-            <p className="text-xs font-bold text-blue-400 uppercase">📊 Média</p>
-            <p className="text-xl font-bold text-blue-400">7.45</p>
+            <p className="text-xs font-bold text-blue-400 uppercase">📊 Total</p>
+            <p className="text-xl font-bold text-blue-400">67.05</p>
             <p className="text-xs text-blue-300">pts (82% cobertura)</p>
           </div>
         </div>

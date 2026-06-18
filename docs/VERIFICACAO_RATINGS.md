@@ -44,7 +44,7 @@ import { RoundVerification } from '@/app/app/round-verification'
 
 **Características:**
 - 📊 Cobertura percentual (80%, 90%, etc)
-- 📈 Média de pontos
+- 📈 Total de pontos
 - 💡 Dicas de conferência
 - 🖨️ Botão de print/exportar
 - ✕ Botão de fechar

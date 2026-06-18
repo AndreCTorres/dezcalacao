@@ -4,8 +4,6 @@
 import { LogoutButton } from '../components/logout-button'
 import { ModeSwitcher } from '../components/mode-switcher'
 import { AddMemberForm } from './add-member-form'
-import { SyncPlayersButton } from './sync-players-button'
-import { SeedUsersButton } from './seed-users-button'
 import { LinkMemberForm } from './link-member-form'
 import Link from 'next/link'
 
@@ -159,7 +157,6 @@ export function GroupPanel({ group, members, isAdmin }: GroupPanelProps) {
                 <div className="space-y-3">
                   <h3 className="text-sm font-bold text-lime-400">➕ Adicionar Membro</h3>
                   <AddMemberForm groupId={group.id} />
-                  <SeedUsersButton groupId={group.id} />
                 </div>
               )}
             </div>
@@ -179,7 +176,9 @@ export function GroupPanel({ group, members, isAdmin }: GroupPanelProps) {
                   <p className="text-gray-400 text-sm">
                     Sincronize os convocados da Copa 2026 antes do draft.
                   </p>
-                  <SyncPlayersButton />
+                  <p className="text-xs text-gray-500 bg-gray-900/50 p-3 rounded-lg">
+                    Sincronizacao automatica removida do deploy. Use o banco ja preparado e siga com as rodadas manuais.
+                  </p>
                 </div>
               ) : (
                 <p className="text-gray-500 text-sm py-4">

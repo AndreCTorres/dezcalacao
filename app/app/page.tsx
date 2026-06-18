@@ -1,5 +1,5 @@
 // app/app/page.tsx
-// Home do participante: campinho com time, pontuação por jogador, ranking
+// Central do Participante: Tudo em um lugar (campinho, escalação, ranking, substituições, pontuação)
 
 import { createActionClient, supabaseAdmin } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
@@ -12,6 +12,23 @@ import { ParticipantStandings } from './participant-standings'
 import { RoundDetails } from './round-details'
 import { PostRoundSwaps } from './post-round-swaps'
 import { getPostRoundData } from './post-round-actions'
+import { FirstEntryWrapper } from './first-entry-wrapper'
+
+const ROUND_ORDER = [
+  'Fase de Grupos - Rodada 1',
+  'Fase de Grupos - Rodada 2',
+  'Fase de Grupos - Rodada 3',
+  '16 Avos de Final',
+  'Oitavas de Final',
+  'Quartas de Final',
+  'Semifinal',
+  'Final',
+]
+
+function getRoundOrder(name: string) {
+  const index = ROUND_ORDER.indexOf(name)
+  return index === -1 ? ROUND_ORDER.length : index
+}
 
 export default async function AppPage() {
   const supabase = await createActionClient()
@@ -93,7 +110,7 @@ export default async function AppPage() {
   // Buscar grupo separadamente (evita problema de join/schema cache)
   const { data: group, error: groupError } = await admin
     .from('groups')
-    .select('id, name, status, season, admin_id')
+    .select('id, name, status, season, admin_id, max_subs_por_rodada')
     .eq('id', membershipRow.group_id)
     .single()
 
@@ -136,54 +153,44 @@ export default async function AppPage() {
     .eq('group_member_id', groupMemberId)
     .order('slot', { ascending: false })
 
-  // Buscar rodada mais recente (scored ou open) para puxar ratings
-  const { data: latestRound } = await admin
+  // Buscar rodadas (scored e open)
+  // Prioridade: Rodada aberta > Rodada scored mais recente
+  let { data: allRounds, error: allRoundsError } = await admin
     .from('rounds')
-    .select('id, name, status')
+    .select('id, name, status, starts_at, finalized_at, created_at')
     .eq('group_id', group.id)
     .in('status', ['scored', 'open'])
     .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+    .limit(10) // Pega últimas 10 para ter contexto
 
-  const { data: latestScoredRound } = await admin
-    .from('rounds')
-    .select('id, name, status')
-    .eq('group_id', group.id)
-    .eq('status', 'scored')
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  // Prioridade: rodada pontuada > qualquer rodada com ratings no banco
-  // Busca todas as rodadas e encontra a mais recente com ratings reais
-  let ratingsRound = latestScoredRound ?? null
-
-  if (!ratingsRound && teamPlayers && teamPlayers.length > 0) {
-    // Não há rodada scored — procurar rodada open que já tenha ratings inseridos
-    const { data: allRounds } = await admin
+  // Encontrar: primeira rodada aberta, primeira scored, e última com ratings
+  if (allRoundsError) {
+    const fallback = await admin
       .from('rounds')
-      .select('id, name, status')
+      .select('id, name, status, starts_at, created_at')
       .eq('group_id', group.id)
       .in('status', ['scored', 'open'])
       .order('created_at', { ascending: false })
+      .limit(10)
 
-    if (allRounds) {
-      const teamPlayerIds = teamPlayers.map((tp: any) => tp.player_id)
-      for (const round of allRounds) {
-        const { count } = await admin
-          .from('player_round_ratings')
-          .select('id', { count: 'exact', head: true })
-          .eq('round_id', round.id)
-          .in('player_id', teamPlayerIds)
-          .not('rating', 'is', null)
-        if ((count ?? 0) > 0) {
-          ratingsRound = round
-          break
-        }
-      }
-    }
+    allRounds = (fallback.data ?? []).map((round: any) => ({ ...round, finalized_at: null }))
   }
+
+  const roundsByTournamentOrder = [...(allRounds ?? [])].sort((a, b) => {
+    const startsA = a.starts_at ? new Date(a.starts_at).getTime() : Number.POSITIVE_INFINITY
+    const startsB = b.starts_at ? new Date(b.starts_at).getTime() : Number.POSITIVE_INFINITY
+    if (startsA !== startsB) return startsA - startsB
+    return getRoundOrder(a.name) - getRoundOrder(b.name)
+  })
+  const displayRound =
+    roundsByTournamentOrder.find((r) => r.status === 'open') ??
+    [...roundsByTournamentOrder].reverse().find((r) => r.status === 'scored') ??
+    roundsByTournamentOrder[0] ??
+    null
+  const scoredRound = [...roundsByTournamentOrder].reverse().find((r) => r.status === 'scored') ?? null
+  
+  // Para ratings: usar rodada scored mais recente (ou aberta se tiver dados)
+  const ratingsSourceRound = scoredRound ?? displayRound
 
   const normalizeRatingKey = (name?: string | null, teamName?: string | null) =>
     `${name ?? ''}|${teamName ?? ''}`
@@ -194,23 +201,19 @@ export default async function AppPage() {
       .replace(/\s+/g, ' ')
       .trim()
 
-  // Buscar ratings da rodada pontuada mais recente
-  // Filtra pelos player_ids do time para garantir que reservas com nota apareçam
+  // Buscar ratings de todos os jogadores
+  // Usando rodada com dados + fallback para scored ou aberta
   let ratingsMap: Record<number, number | null> = {}
   let ratingsByPlayerKey: Record<string, number | null> = {}
-  if (ratingsRound && teamPlayers && teamPlayers.length > 0) {
-    const teamPlayerIds = teamPlayers.map((tp: any) => tp.player_id)
-
+  
+  if (ratingsSourceRound && teamPlayers && teamPlayers.length > 0) {
     const { data: ratings } = await admin
       .from('player_round_ratings')
       .select('player_id, rating, players ( name, team_name )')
-      .eq('round_id', ratingsRound.id)
-      .in('player_id', teamPlayerIds)
+      .eq('round_id', ratingsSourceRound.id)
 
     if (ratings) {
       for (const r of ratings as any[]) {
-        // Inclui todos, mesmo rating null (para saber que o registro existe)
-        // mas só coloca no map se tiver nota real
         if (r.rating != null) {
           ratingsMap[r.player_id] = r.rating
         }
@@ -230,6 +233,7 @@ export default async function AppPage() {
       null,
   }))
 
+  // Buscar substituições da rodada aberta (se houver)
   // Buscar membros do grupo para ranking
   const { data: members } = await admin
     .from('group_members')
@@ -238,92 +242,129 @@ export default async function AppPage() {
 
   // Buscar dados de trocas pós-rodada (rodada scored mais recente)
   const postRoundData = await getPostRoundData(groupMemberId)
+  const membersWithInvertedFullbacks = new Set(['lucas', 'danyel', 'gombas', 'joao', 'pedro'])
+  const normalizedMemberName = membership.display_name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+  const lateralSideMode = membersWithInvertedFullbacks.has(normalizedMemberName) ? 'inverted' : 'normal'
 
   return (
-    <div className="min-h-screen text-white" style={{ background: '#0a0e0c' }}>
-      <div className="w-full max-w-[1440px] mx-auto px-3 py-3 sm:px-5 sm:py-4 xl:px-8">
+    <FirstEntryWrapper
+      memberId={groupMemberId}
+      currentDisplayName={membership.display_name}
+      currentTeamName={membership.team_name}
+    >
+      <div className="min-h-screen text-white" style={{ background: '#0a0e0c' }}>
+        <div className="w-full max-w-[1440px] mx-auto px-3 py-3 sm:px-5 sm:py-4 xl:px-8">
 
-        {/* Header */}
-        <div className="flex justify-between items-start mb-5 gap-4">
-          <div className="flex-1">
-            <Link href="/" className="text-lime-400 hover:text-lime-300 text-sm mb-3 inline-block">
+        {/* Header com 2 linhas */}
+        <div className="mb-4">
+          {/* Linha 1: Back link | User info + Edit | Logout */}
+          <div className="flex justify-between items-center mb-4">
+            <Link href="/" className="text-lime-400 hover:text-lime-300 text-sm">
               ← Dezcalação
             </Link>
-            <h1
-              className="text-3xl sm:text-4xl font-black text-lime-400 tracking-tight mb-3"
-              style={{ fontFamily: 'Anton, sans-serif', textTransform: 'uppercase' }}
-            >
-              {group.name}
-            </h1>
-            <div className="flex flex-wrap gap-3 items-center text-sm">
-              <span className="text-gray-400">
-                Temporada <span className="text-white font-semibold">{group.season}</span>
-              </span>
-              <span className="text-gray-600">•</span>
-              <span className={group.status === 'active' ? 'text-lime-400 font-medium' : 'text-gray-500'}>
-                {group.status === 'active' ? '🟢 Ativo' :
-                 group.status === 'drafting' ? '📋 Drafting' :
-                 group.status === 'setup' ? '⚙️ Setup' : '🏁 Finalizado'}
-              </span>
-              {latestRound && (
-                <span className="flex items-center gap-2">
-                  <span className="text-gray-600">•</span>
-                  <span className="text-gray-400">
-                    {latestRound.name}
-                    {latestRound.status === 'open' && <span className="text-lime-500 ml-1 font-medium">(aberta)</span>}
-                    {latestRound.status === 'scored' && <span className="text-yellow-500 ml-1 font-medium">(pontuada)</span>}
-                  </span>
-                </span>
-              )}
+            
+            <div className="flex items-center gap-3">
+              <div className="text-right">
+                <p className="text-gray-300 text-base">
+                  👋 <span className="text-lime-400 font-semibold">{membership.display_name}</span>
+                </p>
+                {membership.team_name && (
+                  <p className="text-gray-400 text-sm mt-0.5">
+                    🏆 <span className="text-lime-300">{membership.team_name}</span>
+                  </p>
+                )}
+              </div>
+              <ProfileEditButton
+                memberId={groupMemberId}
+                currentDisplayName={membership.display_name}
+                currentTeamName={membership.team_name}
+              />
+              {isAdmin && <ModeSwitcher isAdmin={isAdmin} />}
+              <LogoutButton />
             </div>
           </div>
-          <div className="flex flex-col gap-3 items-end">
-            {isAdmin && <ModeSwitcher isAdmin={isAdmin} />}
-            <LogoutButton />
+
+          {/* Linha 2: Título + Info | Botões centralizados */}
+          <div className="flex justify-between items-start">
+            <div>
+              <h1
+                className="text-3xl sm:text-4xl font-black text-lime-400 tracking-tight mb-3"
+                style={{ fontFamily: 'Anton, sans-serif', textTransform: 'uppercase' }}
+              >
+                {group.name}
+              </h1>
+              <div className="flex flex-wrap gap-3 items-center text-sm">
+                <span className="text-gray-400">
+                  Temporada <span className="text-white font-semibold">{group.season}</span>
+                </span>
+                <span className="text-gray-600">•</span>
+                <span className={group.status === 'active' ? 'text-lime-400 font-medium' : 'text-gray-500'}>
+                  {group.status === 'active' ? '🟢 Ativo' :
+                   group.status === 'drafting' ? '📋 Drafting' :
+                   group.status === 'setup' ? '⚙️ Setup' : '🏁 Finalizado'}
+                </span>
+                {displayRound && (
+                  <span className="flex items-center gap-2">
+                    <span className="text-gray-600">•</span>
+                    <span className="text-gray-400">
+                      <span className="text-lime-300 font-medium">{displayRound.name}</span>
+                      {displayRound.status === 'open' && <span className="text-lime-500 ml-1 font-medium">(aberta)</span>}
+                      {displayRound.status === 'scored' && <span className="text-yellow-500 ml-1 font-medium">(pontuada)</span>}
+                    </span>
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Botões centralizados */}
+            <div className="flex gap-2">
+              <Link
+                href="/app/notas"
+                className="text-base font-bold px-6 py-3 rounded-full bg-white/5 text-gray-100 border border-white/10 hover:border-lime-400/50 hover:text-lime-300 transition whitespace-nowrap"
+              >
+                📋 Notas de cada partida
+              </Link>
+              <Link
+                href="/app/selecao"
+                className="text-base font-bold px-6 py-3 rounded-full bg-lime-400/15 text-lime-300 border border-lime-400/40 hover:bg-lime-400/25 transition whitespace-nowrap"
+              >
+                👑 Seleção da semana
+              </Link>
+            </div>
           </div>
         </div>
 
-        {/* Bem-vindo */}
-        <div className="mb-5 p-3 bg-gray-800/30 backdrop-blur rounded-lg border border-gray-700/50 flex justify-between items-center">
-          <div>
-            <p className="text-gray-300 text-sm">
-              👋 Bem-vindo, <span className="text-lime-400 font-semibold">{membership.display_name}</span>
-            </p>
-            {membership.team_name && (
-              <p className="text-gray-400 text-xs mt-1">
-                🏆 Seu time: <span className="text-lime-300">{membership.team_name}</span>
-              </p>
-            )}
-          </div>
-          <ProfileEditButton
-            memberId={groupMemberId}
-            currentDisplayName={membership.display_name}
-            currentTeamName={membership.team_name}
-          />
-        </div>
-
-        {/* Grid principal */}
-        <div className="grid grid-cols-1 xl:grid-cols-[minmax(440px,500px)_1fr] gap-5 mb-5 items-stretch max-h-[650px] overflow-hidden">
+        {/* Grid principal — todos com mesma altura, alinhados na base */}
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(500px,560px)_1fr] gap-4 mb-4 items-stretch">
 
           {/* Campinho + Banco */}
           <div className="w-full h-full">
-            <PitchView team={teamWithRatings} memberTeamName={membership.team_name} />
+            <PitchView team={teamWithRatings} memberTeamName={membership.team_name} lateralSideMode={lateralSideMode} />
           </div>
 
-          {/* Ranking + Rodadas — ocupam todo o espaço restante */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 h-full items-stretch overflow-hidden">
-            <ParticipantStandings
-              groupId={group.id}
-              members={members || []}
-              currentMemberId={groupMemberId}
-            />
-            <RoundDetails groupId={group.id} currentMemberId={groupMemberId} />
+          {/* Ranking + Rodadas */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 w-full h-full">
+            <div>
+              <ParticipantStandings
+                groupId={group.id}
+                members={members || []}
+                currentMemberId={groupMemberId}
+              />
+            </div>
+            <div>
+              <RoundDetails groupId={group.id} currentMemberId={groupMemberId} />
+            </div>
           </div>
         </div>
 
+        {/* Escalação & Substituições (Rodada Aberta) */}
         {/* Trocas Pós-Rodada */}
         {postRoundData.success && postRoundData.round && (
-          <div className="mb-4">
+          <div id="trocas-pos-rodada" className="mb-4 scroll-mt-6">
             <PostRoundSwaps
               groupMemberId={groupMemberId}
               roundId={postRoundData.round.id}
@@ -335,7 +376,8 @@ export default async function AppPage() {
           </div>
         )}
 
+        </div>
       </div>
-    </div>
+    </FirstEntryWrapper>
   )
 }

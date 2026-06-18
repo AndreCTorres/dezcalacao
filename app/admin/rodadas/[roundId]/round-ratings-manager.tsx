@@ -54,6 +54,17 @@ function ratingColor(r: number | null) {
   return 'bg-red-600 text-white'
 }
 
+function hasFixtureScore(fixture: Fixture) {
+  return fixture.home_goals !== null && fixture.home_goals !== undefined &&
+    fixture.away_goals !== null && fixture.away_goals !== undefined
+}
+
+function hasPartialFixtureScore(fixture: Fixture) {
+  const hasHome = fixture.home_goals !== null && fixture.home_goals !== undefined
+  const hasAway = fixture.away_goals !== null && fixture.away_goals !== undefined
+  return hasHome !== hasAway
+}
+
 function normalizeText(value: string) {
   return value
     .normalize('NFD')
@@ -101,6 +112,9 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
   const totalFixtures = fixtureList.length
   const completeFixtures = fixtureList.filter(f => (fixtureRatedCounts[f.id] ?? 0) > 0).length
   const hasIncompleteFixtures = totalFixtures > 0 && completeFixtures < totalFixtures
+  const fixturesWithScore = fixtureList.filter(hasFixtureScore).length
+  const fixturesWithPartialScore = fixtureList.filter(hasPartialFixtureScore).length
+  const hasPendingScores = totalFixtures > 0 && fixturesWithScore < totalFixtures
 
   async function openFixture(fixture: Fixture) {
     setSelectedFixture(fixture)
@@ -244,12 +258,11 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
     
     // Salvar ratings
     const ratingsResult = await upsertBatchRatings(roundId, selectedFixture.id, parsed)
+    const homeGoals = fixtureScore.home_goals.trim() !== '' ? parseInt(fixtureScore.home_goals, 10) : null
+    const awayGoals = fixtureScore.away_goals.trim() !== '' ? parseInt(fixtureScore.away_goals, 10) : null
     
     // Salvar placar se fornecido
     if (fixtureScore.home_goals.trim() !== '' || fixtureScore.away_goals.trim() !== '') {
-      const homeGoals = fixtureScore.home_goals.trim() !== '' ? parseInt(fixtureScore.home_goals, 10) : null
-      const awayGoals = fixtureScore.away_goals.trim() !== '' ? parseInt(fixtureScore.away_goals, 10) : null
-      
       if ((homeGoals !== null && !Number.isFinite(homeGoals)) || (awayGoals !== null && !Number.isFinite(awayGoals))) {
         setFeedback({ type: 'error', msg: 'Placar deve conter números válidos.' })
         setSavingFixture(false)
@@ -268,6 +281,12 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
 
     const ratedCount = parsed.filter(r => r.rating !== null).length
     setFixtureRatedCounts(prev => ({ ...prev, [selectedFixture.id]: ratedCount }))
+    setFixtureList(prev => prev.map(f => (
+      f.id === selectedFixture.id
+        ? { ...f, home_goals: homeGoals, away_goals: awayGoals }
+        : f
+    )))
+    setSelectedFixture(prev => prev ? { ...prev, home_goals: homeGoals, away_goals: awayGoals } : prev)
     setFeedback({ type: 'success', msg: `${ratedCount} notas salvas para este jogo.` })
     setTimeout(() => setFeedback(null), 2500)
   }
@@ -443,11 +462,43 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
         </div>
       )}
 
+      {fixtureList.length > 0 && (
+        <div className={`rounded-xl border p-4 ${
+          hasPendingScores
+            ? 'bg-yellow-500/10 border-yellow-500/25'
+            : 'bg-lime-500/10 border-lime-500/25'
+        }`}>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <h3 className="text-sm font-bold text-white">Placar dos jogos</h3>
+              <p className="text-xs text-gray-400 mt-0.5">
+                Confira se todos os resultados foram preenchidos antes de fechar a rodada.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 text-xs">
+              <span className="rounded-full bg-lime-400/15 text-lime-300 border border-lime-400/25 px-2.5 py-1 font-bold">
+                {fixturesWithScore}/{totalFixtures} com placar
+              </span>
+              {fixturesWithPartialScore > 0 && (
+                <span className="rounded-full bg-orange-400/15 text-orange-300 border border-orange-400/25 px-2.5 py-1 font-bold">
+                  {fixturesWithPartialScore} parcial
+                </span>
+              )}
+              {hasPendingScores && (
+                <span className="rounded-full bg-yellow-400/15 text-yellow-300 border border-yellow-400/25 px-2.5 py-1 font-bold">
+                  {totalFixtures - fixturesWithScore} pendente
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {fixtureList.map((fixture) => {
         const count = fixtureRatedCounts[fixture.id] ?? 0
         const hasRatings = count > 0
-        const hasScore = fixture.home_goals !== null && fixture.home_goals !== undefined && 
-                         fixture.away_goals !== null && fixture.away_goals !== undefined
+        const hasScore = hasFixtureScore(fixture)
+        const hasPartialScore = hasPartialFixtureScore(fixture)
         const kickoffDate = fixture.kickoff ? new Date(fixture.kickoff) : null
 
         return (
@@ -456,6 +507,36 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
             onClick={() => openFixture(fixture)}
             className="w-full text-left bg-gray-800 hover:bg-gray-700/80 border border-gray-700 hover:border-lime-500/40 rounded-xl p-4 transition group"
           >
+            <div className="mb-3 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+              <p className="truncate text-right text-sm font-bold text-white group-hover:text-lime-300 transition">
+                {fixture.home_team}
+              </p>
+              <div className={`rounded-xl border px-3 py-2 min-w-24 text-center ${
+                hasScore
+                  ? 'bg-lime-400/10 border-lime-400/30'
+                  : hasPartialScore
+                    ? 'bg-orange-400/10 border-orange-400/30'
+                    : 'bg-gray-900/70 border-gray-600'
+              }`}>
+                <div className="flex items-center justify-center gap-2 font-mono font-black text-lg">
+                  <span className={hasScore || hasPartialScore ? 'text-white' : 'text-gray-500'}>
+                    {fixture.home_goals ?? '-'}
+                  </span>
+                  <span className="text-xs text-gray-500">x</span>
+                  <span className={hasScore || hasPartialScore ? 'text-white' : 'text-gray-500'}>
+                    {fixture.away_goals ?? '-'}
+                  </span>
+                </div>
+                <span className={`mt-1 inline-block text-[10px] font-bold uppercase tracking-wide ${
+                  hasScore ? 'text-lime-300' : hasPartialScore ? 'text-orange-300' : 'text-yellow-300'
+                }`}>
+                  {hasScore ? 'Placar ok' : hasPartialScore ? 'Parcial' : 'Pendente'}
+                </span>
+              </div>
+              <p className="truncate text-left text-sm font-bold text-white group-hover:text-lime-300 transition">
+                {fixture.away_team}
+              </p>
+            </div>
             <div className="flex items-center justify-between gap-4">
               {/* Time e resultado */}
               <div className="flex-1 min-w-0">
@@ -725,10 +806,10 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
                               <button
                                 type="button"
                                 onClick={() => setPlayerLineupRole(player.id, 'substitute')}
-                                className="w-16 bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/30 text-orange-200 text-[11px] font-semibold rounded px-1 py-1.5 transition shrink-0"
-                                title="Mover para reservas"
+                                className="w-16 bg-lime-500/10 hover:bg-orange-500/20 border border-lime-500/30 hover:border-orange-500/30 text-lime-200 hover:text-orange-200 text-[11px] font-semibold rounded px-1 py-1.5 transition shrink-0"
+                                title="Titular. Clique para mover para reservas."
                               >
-                                Reserva
+                                Titular
                               </button>
 
                               <span className={`text-xs font-bold px-1.5 py-0.5 rounded w-10 text-center shrink-0 ${ratingColor(ratingNum)}`}>
@@ -792,10 +873,10 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
                                 <button
                                   type="button"
                                   onClick={() => setPlayerLineupRole(player.id, 'starter')}
-                                  className="w-16 bg-lime-500/10 hover:bg-lime-500/20 border border-lime-500/30 text-lime-200 text-[11px] font-semibold rounded px-1 py-1.5 transition shrink-0"
-                                  title="Mover para titulares"
+                                  className="w-16 bg-orange-500/10 hover:bg-lime-500/20 border border-orange-500/30 hover:border-lime-500/30 text-orange-200 hover:text-lime-200 text-[11px] font-semibold rounded px-1 py-1.5 transition shrink-0"
+                                  title="Reserva. Clique para mover para titulares."
                                 >
-                                  Titular
+                                  Reserva
                                 </button>
                                 <span className={`text-xs font-bold px-1.5 py-0.5 rounded w-10 text-center shrink-0 ${ratingColor(ratingNum)}`}>
                                   {ratingNum !== null && Number.isFinite(ratingNum) ? ratingNum.toFixed(1) : '-'}
