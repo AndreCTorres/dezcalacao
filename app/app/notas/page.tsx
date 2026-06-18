@@ -9,6 +9,7 @@ import { RoundGames, type GameBlock, type RatedPlayer } from './round-games'
 
 export const dynamic = 'force-dynamic'
 
+// Force rebuild: v2
 function normalize(s: string): string {
   return s
     .normalize('NFD')
