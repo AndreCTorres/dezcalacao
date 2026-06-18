@@ -8,6 +8,7 @@ import { LogoutButton } from '@/app/components/logout-button'
 import { RoundRatingsManager } from './round-ratings-manager'
 import { RoundFinalizationToggle } from './round-finalization-toggle'
 import { RoundStatusActions } from './round-status-actions'
+import { RatingsAuditViewer } from './ratings-audit-viewer'
 
 interface PageProps {
   params: Promise<{ roundId: string }>
@@ -195,6 +196,11 @@ export default async function RoundRatingsPage({ params }: PageProps) {
           fixtures={fixturesWithCount}
           teamOptions={teamOptions}
         />
+
+        {/* Auditoria de ratings */}
+        <div className="mt-8">
+          <RatingsAuditViewer groupId={groupId} roundId={roundId} roundName={round.name} />
+        </div>
 
         {/* Guia */}
         <div className="mt-8 p-4 bg-gray-800/50 rounded-lg border border-gray-700 text-xs text-gray-500 space-y-1">

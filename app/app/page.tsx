@@ -10,6 +10,7 @@ import { ProfileEditButton } from './profile-edit-button'
 import { PitchView, type PitchPlayer } from './pitch-view'
 import { ParticipantStandings } from './participant-standings'
 import { RoundDetails } from './round-details'
+import { RoundCampinhos } from './round-campinhos'
 import { PostRoundSwaps } from './post-round-swaps'
 import { getPostRoundData } from './post-round-actions'
 import { FirstEntryWrapper } from './first-entry-wrapper'
@@ -321,7 +322,7 @@ export default async function AppPage() {
             </div>
 
             {/* Botões centralizados */}
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <Link
                 href="/app/notas"
                 className="text-base font-bold px-6 py-3 rounded-full bg-white/5 text-gray-100 border border-white/10 hover:border-lime-400/50 hover:text-lime-300 transition whitespace-nowrap"
@@ -333,6 +334,12 @@ export default async function AppPage() {
                 className="text-base font-bold px-6 py-3 rounded-full bg-lime-400/15 text-lime-300 border border-lime-400/40 hover:bg-lime-400/25 transition whitespace-nowrap"
               >
                 👑 Seleção da semana
+              </Link>
+              <Link
+                href="/app/times"
+                className="text-base font-bold px-6 py-3 rounded-full bg-white/5 text-gray-100 border border-white/10 hover:border-lime-400/50 hover:text-lime-300 transition whitespace-nowrap"
+              >
+                👥 Times dos participantes
               </Link>
             </div>
           </div>
@@ -375,6 +382,11 @@ export default async function AppPage() {
             />
           </div>
         )}
+
+        {/* Campinhos com notas detalhadas */}
+        <div className="mt-6">
+          <RoundCampinhos groupId={group.id} />
+        </div>
 
         </div>
       </div>

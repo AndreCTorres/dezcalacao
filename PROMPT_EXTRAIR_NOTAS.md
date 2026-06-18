@@ -1,110 +1,139 @@
-# 📋 Prompt para Extrair Notas de Screenshots
+# Prompt para Extrair Notas de Screenshots
 
-Cole este prompt no ChatGPT junto com seus screenshots dos resultados de jogos.
+Cole este prompt no ChatGPT junto com os screenshots dos resultados de jogos.
 
 ---
 
-## Instrução para o ChatGPT:
+## Instrucao para o ChatGPT
 
-Você vai receber screenshots de partidas da Copa do Mundo 2026 (em um app de fantasy draft chamado Dezcalação). Para cada screenshot:
+Voce vai receber screenshots de partidas da Copa do Mundo 2026 para alimentar um app de fantasy draft chamado Dezcalacao.
 
-1. **Identifique:**
-   - Nome do jogo (ex: "Brasil x Uruguai")
-   - Placar final (ex: "2 x 1")
-   - Lista de jogadores que jogaram, com:
-     - Nome do jogador
-     - Nota/rating (número de 0-10, pode ter decimais)
-     - Minutos jogados (número inteiro)
+Para cada jogo, extraia somente dados visiveis ou muito provaveis do print e devolva em JSON valido.
 
-2. **Extraia em este formato JSON:**
+## Formato obrigatorio
+
+Responda somente com JSON, sem markdown, sem explicacoes antes ou depois.
 
 ```json
 {
   "fixture": {
-    "title": "BRASIL x URUGUAI",
-    "homeTeam": "Brasil",
-    "awayTeam": "Uruguai",
-    "homeGoals": 2,
+    "title": "QATAR x SWITZERLAND",
+    "homeTeam": "Qatar",
+    "awayTeam": "Switzerland",
+    "homeGoals": 1,
     "awayGoals": 1
   },
   "players": [
-    {
-      "name": "Vinicius Jr",
-      "team": "Brasil",
-      "rating": 8.5,
-      "minutes": 90
-    },
-    {
-      "name": "Rodrygo",
-      "team": "Brasil",
-      "rating": 7.2,
-      "minutes": 76
-    },
-    {
-      "name": "Neymar",
-      "team": "Brasil",
-      "rating": 8.1,
-      "minutes": 90
-    },
-    {
-      "name": "Luis Suárez",
-      "team": "Uruguai",
-      "rating": 6.8,
-      "minutes": 88
-    }
+    { "name": "M. I. Abunada", "team": "Qatar", "rating": 6.9, "minutes": 90 },
+    { "name": "B. Khoukhi", "team": "Qatar", "rating": 6.4, "minutes": 90 },
+    { "name": "P. Miguel", "team": "Qatar", "rating": 7.4, "minutes": 90 },
+    { "name": "G. Kobel", "team": "Switzerland", "rating": 7.2, "minutes": 90 },
+    { "name": "G. Xhaka", "team": "Switzerland", "rating": 7.2, "minutes": 90 }
   ]
 }
 ```
 
-3. **Regras importantes:**
-   - Se a nota não aparecer claramente, estime entre 5-7 (neutro)
-   - Se os minutos não aparecerem, use 90 (jogo completo) se fez gol/teve destaque, senão 45-60
-   - Nomes exatos: use a grafia do app/estatísticas oficiais
-   - Ordene players por time (Brasil primeiro, depois adversário)
-   - Se houver multiple screenshots, faça um JSON por jogo (separados por `---`)
+## Regras de padronizacao
 
-4. **Após extrair, forneça:**
-   - O JSON acima
-   - Uma linha de verificação: `JOGO VALIDADO: [Time1] X [Time2] | [N] jogadores`
+- Use nomes das selecoes em ingles, no padrao do banco/API-Football.
+- Use `Qatar`, nunca `Catar`.
+- Use `Switzerland`, nunca `Suica`.
+- Use `Brazil`, nunca `Brasil`.
+- Use `Germany`, nunca `Alemanha`.
+- Use `South Korea`, nunca `Coreia do Sul`.
+- Use `Czech Republic` ou `Czechia`, nunca `Rep. Tcheca`.
+- Use `United States` ou `USA`, nunca `EUA`.
+- Use `Morocco`, nunca `Marrocos`.
+- Use `Turkey`, nunca `Turquia`.
+- Use `Japan`, nunca `Japao`.
+- Use `Netherlands`, nunca `Holanda`.
+- Use `Ivory Coast`, nunca `Costa do Marfim`.
+- Use `Ecuador`, nunca `Equador`.
+- Use `Paraguay`, nunca `Paraguai`.
+- Use `South Africa`, nunca `Africa do Sul`.
 
----
+## Regras para nomes dos jogadores
 
-## Exemplo de resposta esperada:
+- Priorize o nome curto exibido no app de estatisticas, porque o banco costuma usar esse padrao.
+- Quando o print mostrar nome completo, prefira a versao curta/abreviada mais comum.
+- Exemplos:
+  - `Boualem Khoukhi` deve virar `B. Khoukhi`.
+  - `Pedro Miguel` deve virar `P. Miguel`.
+  - `Jassem Gaber Abdulsallam` deve virar `J. G. Abdulsallam`.
+  - `Assim Madibo` deve virar `A. Madibo`.
+  - `Yousef Abdurisag` deve virar `Y. Abdurisag`.
+  - `Edmilson Junior` deve virar `E. Junior`.
+  - `Akram Afif` deve virar `A. Afif`.
+  - `Breel Embolo` deve virar `B. Embolo`.
+  - `Granit Xhaka` deve virar `G. Xhaka`.
+  - `Dan Ndoye` deve virar `D. Ndoye`.
+  - `Michel Aebischer` deve virar `M. Aebischer`.
+  - `Denis Zakaria` deve virar `D. Zakaria`.
+  - `Nico Elvedi` deve virar `N. Elvedi`.
+  - `Manuel Akanji` deve virar `M. Akanji`.
+  - `Ricardo Rodriguez` deve virar `R. Rodriguez`.
+  - `Gregor Kobel` deve virar `G. Kobel`.
+  - `Ruben Vargas` deve virar `R. Vargas`.
+  - `Remo Freuler` deve virar `R. Freuler`.
+
+## Regras de extracao
+
+- Extraia o nome do jogo.
+- Extraia o placar final.
+- Extraia todos os jogadores que participaram da partida.
+- Para cada jogador, extraia:
+  - `name`: nome padronizado do jogador.
+  - `team`: selecao em ingles.
+  - `rating`: nota de 0 a 10, usando ponto decimal.
+  - `minutes`: minutos jogados como numero inteiro.
+- Ordene os jogadores pelo time mandante primeiro e depois pelo visitante.
+- Em geral, devem existir no maximo 16 jogadores por time: 11 titulares + ate 5 reservas que entraram.
+- Nao inclua jogadores que ficaram no banco e nao entraram.
+- Se a nota nao estiver visivel, use `null`.
+- Se os minutos nao estiverem visiveis, estime pelos dados do print. Se nao houver pista, use `90` para titular e `0` para jogador que nao entrou.
+
+## Validacao antes de responder
+
+Antes de finalizar, confira:
+
+- `homeTeam` e `awayTeam` estao em ingles.
+- Todos os valores `team` nos jogadores estao em ingles.
+- O JSON e valido.
+- Nao ha texto fora do JSON.
+- Nao ha jogadores duplicados.
+- Nao ha mais de 16 jogadores por time.
+
+## Exemplo completo
 
 ```json
 {
   "fixture": {
-    "title": "BRASIL x URUGUAI",
-    "homeTeam": "Brasil",
-    "awayTeam": "Uruguai",
-    "homeGoals": 2,
+    "title": "QATAR x SWITZERLAND",
+    "homeTeam": "Qatar",
+    "awayTeam": "Switzerland",
+    "homeGoals": 1,
     "awayGoals": 1
   },
   "players": [
-    {"name": "Vinicius Jr", "team": "Brasil", "rating": 8.5, "minutes": 90},
-    {"name": "Rodrygo", "team": "Brasil", "rating": 7.2, "minutes": 76},
-    {"name": "Neymar", "team": "Brasil", "rating": 8.1, "minutes": 90},
-    {"name": "Luis Suárez", "team": "Uruguai", "rating": 6.8, "minutes": 88}
+    { "name": "M. I. Abunada", "team": "Qatar", "rating": 6.9, "minutes": 90 },
+    { "name": "B. Khoukhi", "team": "Qatar", "rating": 6.4, "minutes": 90 },
+    { "name": "P. Miguel", "team": "Qatar", "rating": 7.4, "minutes": 90 },
+    { "name": "A. Madibo", "team": "Qatar", "rating": 6.3, "minutes": 79 },
+    { "name": "A. Afif", "team": "Qatar", "rating": 7.2, "minutes": 90 },
+    { "name": "G. Kobel", "team": "Switzerland", "rating": 7.2, "minutes": 90 },
+    { "name": "G. Xhaka", "team": "Switzerland", "rating": 7.2, "minutes": 90 },
+    { "name": "B. Embolo", "team": "Switzerland", "rating": 7.0, "minutes": 90 },
+    { "name": "R. Rodriguez", "team": "Switzerland", "rating": 7.6, "minutes": 89 },
+    { "name": "R. Vargas", "team": "Switzerland", "rating": 7.9, "minutes": 79 }
   ]
 }
 ```
 
-JOGO VALIDADO: Brasil X Uruguai | 4 jogadores
-
 ---
 
-## Como usar:
+## Como usar
 
-1. Você: Manda print(s) + este prompt pro ChatGPT
-2. ChatGPT: Extrai e valida os dados em JSON
-3. Você: Copia o JSON + valida os nomes
-4. Você: Usa o script `scripts/bulk-insert-ratings.mjs` pra importar pro banco
-
----
-
-**Dúvidas?** Se o ChatGPT não conseguir extrair de um screenshot, peça:
-- "Aumenta o zoom nessa área"
-- "Reescreve em minúsculas os nomes"
-- "Confirma se viu [X jogador]"
-
-Boa sorte! 🚀
+1. Envie este prompt junto com os prints.
+2. Copie somente o JSON retornado.
+3. Cole o JSON na tela de notas do jogo correspondente.
+4. Revise o contador de correspondencias antes de salvar.

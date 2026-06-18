@@ -187,7 +187,6 @@ export async function getLiveRoundScores(admin: SupabaseAdmin, groupId: string):
           points: round2(hasSourceRating ? points : fallback),
         }
       })
-      .filter((score) => score.points > 0)
       .sort((a, b) => b.points - a.points)
 
     return {

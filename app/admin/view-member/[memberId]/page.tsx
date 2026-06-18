@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { PitchView, type PitchPlayer } from '@/app/app/pitch-view'
 import { ParticipantStandings } from '@/app/app/participant-standings'
 import { RoundDetails } from '@/app/app/round-details'
+import { RoundCampinhos } from '@/app/app/round-campinhos'
 
 export default async function ViewMemberPage({
   params,
@@ -287,6 +288,11 @@ export default async function ViewMemberPage({
             {/* Detalhes de Rodadas */}
             <div className="mt-6">
               <RoundDetails groupId={group.id} currentMemberId={groupMemberId} />
+            </div>
+
+            {/* Campinhos com notas */}
+            <div className="mt-6">
+              <RoundCampinhos groupId={group.id} />
             </div>
           </>
         )}

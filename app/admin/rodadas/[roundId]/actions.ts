@@ -189,6 +189,11 @@ export async function upsertBatchRatings(
     }
   }
 
+  // Validar que fixture_id é válido
+  if (!fixtureId || fixtureId <= 0) {
+    return { success: false, error: 'Fixture inválido' }
+  }
+
   const rows = ratings
     .filter((r) => r.rating !== null)
     .map((r) => ({
@@ -206,6 +211,8 @@ export async function upsertBatchRatings(
     return { success: false, error: 'Preencha pelo menos uma nota antes de salvar.' }
   }
 
+  console.log(`[ManualRatings] Salvando ${rows.length} ratings para fixture ${fixtureId}, rodada ${roundId}`)
+
   const { error } = await admin
     .from('player_round_ratings')
     .upsert(rows, { onConflict: 'player_id,round_id' })
@@ -214,6 +221,8 @@ export async function upsertBatchRatings(
     console.error('[ManualRatings] Erro no batch upsert:', error)
     return { success: false, error: error.message }
   }
+
+  console.log(`[ManualRatings] ✅ ${rows.length} ratings salvos com sucesso para fixture ${fixtureId}, rodada ${roundId}`)
 
   revalidatePath(`/admin/rodadas/${roundId}`)
   revalidatePath('/app')
@@ -933,4 +942,79 @@ export async function toggleRoundFinalized(roundId: string, finalized: boolean) 
   revalidatePath('/admin/rodadas')
   revalidatePath('/app')
   return { success: true }
+}
+
+
+/**
+ * Diagnóstico: Verificar quais ratings foram salvos para uma rodada
+ * Útil para validar se notas estão sendo computadas corretamente
+ */
+export async function verifyRoundRatings(groupId: string, roundId: string) {
+  const supabase = await createActionClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) return { success: false, error: 'Não autenticado' }
+
+  const admin = supabaseAdmin()
+
+  // Validar permissão
+  const { data: round } = await admin
+    .from('rounds')
+    .select('id, group_id, name, groups!inner(admin_id)')
+    .eq('id', roundId)
+    .eq('group_id', groupId)
+    .single()
+
+  if (!round || (round.groups as any).admin_id !== user.id) {
+    return { success: false, error: 'Sem permissão' }
+  }
+
+  // Buscar todos os ratings da rodada
+  const { data: allRatings } = await admin
+    .from('player_round_ratings')
+    .select('id, player_id, fixture_id, rating, minutes, players(name, team_name)')
+    .eq('round_id', roundId)
+
+  // Contar por status
+  const withRating = (allRatings ?? []).filter(r => r.rating != null).length
+  const withoutRating = (allRatings ?? []).filter(r => r.rating == null).length
+  const withFixtureId = (allRatings ?? []).filter(r => r.fixture_id != null).length
+  const withoutFixtureId = (allRatings ?? []).filter(r => r.fixture_id == null).length
+
+  // Ratings problemáticos
+  const problematic = (allRatings ?? []).filter(r => r.rating == null || r.fixture_id == null)
+
+  console.log(`[RoundDiagnostic] Rodada: ${round.name}`)
+  console.log(`[RoundDiagnostic] Total ratings: ${allRatings?.length ?? 0}`)
+  console.log(`[RoundDiagnostic] Com nota (rating != NULL): ${withRating}`)
+  console.log(`[RoundDiagnostic] Sem nota (rating = NULL): ${withoutRating}`)
+  console.log(`[RoundDiagnostic] Com fixture_id: ${withFixtureId}`)
+  console.log(`[RoundDiagnostic] Sem fixture_id (NULL): ${withoutFixtureId}`)
+  if (problematic.length > 0) {
+    console.log(`[RoundDiagnostic] ⚠️ ${problematic.length} ratings problemáticos encontrados:`)
+    problematic.slice(0, 10).forEach(r => {
+      console.log(`  - Player ${r.player_id} (${(r.players as any)?.name}): rating=${r.rating}, fixture_id=${r.fixture_id}`)
+    })
+  }
+
+  return {
+    success: true,
+    round: {
+      id: round.id,
+      name: round.name,
+    },
+    stats: {
+      total: allRatings?.length ?? 0,
+      withRating,
+      withoutRating,
+      withFixtureId,
+      withoutFixtureId,
+      problematic: problematic.length,
+    },
+    problematicRatings: problematic.slice(0, 10).map(r => ({
+      player_id: r.player_id,
+      player_name: (r.players as any)?.name,
+      rating: r.rating,
+      fixture_id: r.fixture_id,
+    })),
+  }
 }
