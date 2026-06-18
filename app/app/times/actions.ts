@@ -102,18 +102,25 @@ export async function getParticipantTeam(groupId: string, selectedMemberId: stri
       .eq('round_id', latestRound.id)
 
     if (postRoundSwaps && postRoundSwaps.length > 0) {
-      const swapsMap = new Map(postRoundSwaps.map((swap) => [swap.out_player_id, swap.in_player_id]))
-      teamForDisplay = teamForDisplay.map((tp: any) => {
-        const replacementId = swapsMap.get(tp.player_id)
-        if (!replacementId || tp.slot !== 'starter') return tp
+      const byPlayerId = new Map(teamForDisplay.map((player: any) => [player.player_id, player]))
+      const swapByPlayerId = new Map<number, number>()
 
-        const replacement = teamForDisplay.find((candidate: any) => candidate.player_id === replacementId)
-        if (!replacement) return tp
+      for (const swap of postRoundSwaps) {
+        swapByPlayerId.set(swap.out_player_id, swap.in_player_id)
+        swapByPlayerId.set(swap.in_player_id, swap.out_player_id)
+      }
+
+      teamForDisplay = teamForDisplay.map((slotPlayer: any) => {
+        const swappedPlayerId = swapByPlayerId.get(slotPlayer.player_id)
+        if (!swappedPlayerId) return slotPlayer
+
+        const swappedPlayer = byPlayerId.get(swappedPlayerId)
+        if (!swappedPlayer) return slotPlayer
 
         return {
-          ...tp,
-          player_id: replacement.player_id,
-          players: replacement.players,
+          ...slotPlayer,
+          player_id: swappedPlayer.player_id,
+          players: swappedPlayer.players,
         }
       })
     }

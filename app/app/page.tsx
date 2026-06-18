@@ -204,43 +204,34 @@ export default async function AppPage() {
   // Buscar dados de trocas pós-rodada (rodada scored mais recente)
   const postRoundData = await getPostRoundData(groupMemberId)
 
-  // Aplicar trocas pós-rodada: se há trocas confirmadas, aplicá-las ao time exibido
+  const swapDisplayedPlayers = (players: any[], swaps: Array<{ out_player_id: number; in_player_id: number }>) => {
+    const byPlayerId = new Map(players.map((player) => [player.player_id, player]))
+    const swapByPlayerId = new Map<number, number>()
+
+    for (const swap of swaps) {
+      swapByPlayerId.set(swap.out_player_id, swap.in_player_id)
+      swapByPlayerId.set(swap.in_player_id, swap.out_player_id)
+    }
+
+    return players.map((slotPlayer) => {
+      const swappedPlayerId = swapByPlayerId.get(slotPlayer.player_id)
+      if (!swappedPlayerId) return slotPlayer
+
+      const swappedPlayer = byPlayerId.get(swappedPlayerId)
+      if (!swappedPlayer) return slotPlayer
+
+      return {
+        ...slotPlayer,
+        player_id: swappedPlayer.player_id,
+        players: swappedPlayer.players,
+      }
+    })
+  }
+
+  // Aplicar trocas pós-rodada como permuta visual: titular entra no banco e reserva entra no campo
   let teamPlayersWithSubs = teamPlayers || []
   if (postRoundData.success && postRoundData.confirmedSwaps && postRoundData.confirmedSwaps.length > 0) {
-    // Criar mapa de trocas: out_player_id -> in_player_id
-    const postSwapsMap = new Map(postRoundData.confirmedSwaps.map(s => [s.out_player_id, s.in_player_id]))
-    
-    // Verificar se há mudanças
-    const hasPostSwapChanges = teamPlayers?.some(tp => 
-      tp.slot === 'starter' && postSwapsMap.has(tp.player_id)
-    )
-
-    // Se há mudanças, aplicar as trocas
-    if (hasPostSwapChanges) {
-      teamPlayersWithSubs = teamPlayers!.map((tp: any) => {
-        const replacement = postSwapsMap.get(tp.player_id)
-        if (replacement && tp.slot === 'starter') {
-          // Encontrar os dados do jogador substituto
-          const subPlayer = postRoundData.players?.find((p: any) => p.player_id === replacement)
-          if (subPlayer) {
-            // Retornar com os dados do jogador que entrou
-            return {
-              ...tp,
-              player_id: replacement,
-              players: {
-                id: subPlayer.id,
-                name: subPlayer.name,
-                team_name: subPlayer.team_name,
-                position: tp.players?.position,
-                photo_url: subPlayer.photo_url,
-                number: tp.players?.number,
-              },
-            }
-          }
-        }
-        return tp
-      })
-    }
+    teamPlayersWithSubs = swapDisplayedPlayers(teamPlayersWithSubs as any[], postRoundData.confirmedSwaps as any[])
   }
 
   // Buscar ratings de todos os jogadores
