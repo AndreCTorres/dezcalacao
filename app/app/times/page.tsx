@@ -39,6 +39,7 @@ export default function TimesPage() {
   const [loading, setLoading] = useState(true)
   const [groupId, setGroupId] = useState<string | null>(null)
   const [currentMemberId, setCurrentMemberId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -46,19 +47,30 @@ export default function TimesPage() {
       try {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) {
+          console.log('[Times] Não autenticado, redirecionando para login')
           window.location.href = '/login'
           return
         }
 
         // Encontrar o grupo do usuário
-        const { data: memberships } = await supabase
+        const { data: memberships, error: membershipError } = await supabase
           .from('group_members')
           .select('id, group_id')
           .eq('profile_id', user.id)
           .eq('status', 'joined')
           .limit(1)
 
+        if (membershipError) {
+          console.error('[Times] Erro ao buscar membros:', membershipError)
+          setError('Erro ao carregar dados: ' + membershipError.message)
+          setLoading(false)
+          return
+        }
+
         if (!memberships || memberships.length === 0) {
+          console.warn('[Times] Usuário não está em nenhum grupo')
+          setError('Você não está em nenhum grupo')
+          setLoading(false)
           return
         }
 
@@ -68,11 +80,18 @@ export default function TimesPage() {
         setCurrentMemberId(currentMembershipId)
 
         // Buscar todos os membros do grupo
-        const { data: groupMembers } = await supabase
+        const { data: groupMembers, error: membersError } = await supabase
           .from('group_members')
           .select('id, display_name, status, profile_id')
           .eq('group_id', currentGroupId)
           .order('display_name', { ascending: true })
+
+        if (membersError) {
+          console.error('[Times] Erro ao buscar membros do grupo:', membersError)
+          setError('Erro ao carregar membros: ' + membersError.message)
+          setLoading(false)
+          return
+        }
 
         if (groupMembers) {
           setMembers(groupMembers)
@@ -81,10 +100,13 @@ export default function TimesPage() {
             setSelectedMemberId(groupMembers[0].id)
           }
         }
+        setError(null)
       } catch (error) {
-        console.error('[Times] Erro ao carregar membros:', error)
+        console.error('[Times] Erro ao carregar dados:', error)
+        setError('Erro ao carregar dados')
+      } finally {
+        setLoading(false)
       }
-      setLoading(false)
     }
 
     fetchData()
@@ -177,6 +199,81 @@ export default function TimesPage() {
       <div className="min-h-screen px-4 py-6" style={{ background: '#0a0e0c' }}>
         <div className="max-w-6xl mx-auto">
           <p className="text-gray-400 text-center">⏳ Carregando...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen px-4 py-6" style={{ background: '#0a0e0c' }}>
+        <div className="max-w-6xl mx-auto">
+          <div className="flex justify-between items-start gap-4 mb-8">
+            <div>
+              <h1
+                className="text-3xl sm:text-4xl font-black tracking-tight mb-2"
+                style={{ fontFamily: 'Anton, sans-serif', textTransform: 'uppercase', color: '#c5f24a' }}
+              >
+                Times dos Participantes
+              </h1>
+            </div>
+            <Link
+              href="/app"
+              className="px-4 py-2 rounded-lg text-sm font-semibold transition"
+              style={{ background: 'rgba(197,242,74,.1)', color: '#c5f24a', border: '1px solid rgba(197,242,74,.3)' }}
+            >
+              ← Voltar
+            </Link>
+          </div>
+          <div
+            className="rounded-xl p-12 text-center"
+            style={{ background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.07)' }}
+          >
+            <p className="text-4xl mb-4">⚠️</p>
+            <p className="text-gray-400 text-lg font-medium mb-2">Erro ao carregar</p>
+            <p className="text-gray-500 text-sm mb-4">{error}</p>
+            <Link
+              href="/app"
+              className="px-4 py-2 rounded-lg text-sm font-semibold transition inline-block"
+              style={{ background: 'rgba(197,242,74,.1)', color: '#c5f24a', border: '1px solid rgba(197,242,74,.3)' }}
+            >
+              ← Voltar para home
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!groupId || members.length === 0) {
+    return (
+      <div className="min-h-screen px-4 py-6" style={{ background: '#0a0e0c' }}>
+        <div className="max-w-6xl mx-auto">
+          <div className="flex justify-between items-start gap-4 mb-8">
+            <div>
+              <h1
+                className="text-3xl sm:text-4xl font-black tracking-tight mb-2"
+                style={{ fontFamily: 'Anton, sans-serif', textTransform: 'uppercase', color: '#c5f24a' }}
+              >
+                Times dos Participantes
+              </h1>
+            </div>
+            <Link
+              href="/app"
+              className="px-4 py-2 rounded-lg text-sm font-semibold transition"
+              style={{ background: 'rgba(197,242,74,.1)', color: '#c5f24a', border: '1px solid rgba(197,242,74,.3)' }}
+            >
+              ← Voltar
+            </Link>
+          </div>
+          <div
+            className="rounded-xl p-12 text-center"
+            style={{ background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.07)' }}
+          >
+            <p className="text-4xl mb-4">👥</p>
+            <p className="text-gray-400 text-lg font-medium mb-2">Você não está em nenhum grupo</p>
+            <p className="text-gray-500 text-sm">Peça ao admin para adicioná-lo a um grupo para ver os times dos participantes.</p>
+          </div>
         </div>
       </div>
     )
