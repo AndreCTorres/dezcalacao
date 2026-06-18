@@ -34,7 +34,7 @@ export default async function RoundsPage() {
   // faz fallback sem a coluna para nao esconder o historico de jogos/rodadas.
   let { data: rounds, error: roundsError } = await admin
     .from('rounds')
-    .select('id, name, status, starts_at, locked_at, finalized_at, ends_at, fixtures_done, fixtures_total, auto_close, created_at')
+    .select('id, name, status, starts_at, locked_at, finalized_at, ends_at, fixtures_done, fixtures_total, auto_close, created_at, sort_order')
     .eq('group_id', group.id)
     .order('created_at', { ascending: false })
 
@@ -45,7 +45,7 @@ export default async function RoundsPage() {
       .eq('group_id', group.id)
       .order('created_at', { ascending: false })
 
-    rounds = (fallback.data ?? []).map((round: any) => ({ ...round, finalized_at: null }))
+    rounds = (fallback.data ?? []).map((round: any) => ({ ...round, finalized_at: null, sort_order: null }))
   }
 
   return (

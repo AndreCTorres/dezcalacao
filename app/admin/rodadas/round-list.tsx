@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { closeRound, reopenRound } from './actions'
+import { closeRound, reopenRound, reorderRounds } from './actions'
 
 type Round = {
   id: string
@@ -16,6 +16,7 @@ type Round = {
   fixtures_total?: number
   auto_close?: boolean
   created_at: string
+  sort_order?: number | null
 }
 
 type RoundListProps = {
@@ -26,6 +27,18 @@ type RoundListProps = {
 export function RoundList({ groupId, rounds }: RoundListProps) {
   const [busyRoundId, setBusyRoundId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [draggedRound, setDraggedRound] = useState<string | null>(null)
+  const [orderedRounds, setOrderedRounds] = useState<Round[]>(
+    [...rounds].sort((a, b) => {
+      // Ordenar por sort_order se existir, senão por created_at
+      const aSort = a.sort_order ?? Number.MAX_VALUE
+      const bSort = b.sort_order ?? Number.MAX_VALUE
+      if (aSort !== bSort) return aSort - bSort
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    })
+  )
+  const [isSaving, setIsSaving] = useState(false)
+
 
   async function handleClose(roundId: string) {
     if (!window.confirm('Fechar rodada agora? O sistema calculara as pontuacoes.')) return
@@ -55,6 +68,59 @@ export function RoundList({ groupId, rounds }: RoundListProps) {
     setBusyRoundId(null)
   }
 
+  function handleDragStart(roundId: string) {
+    setDraggedRound(roundId)
+  }
+
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+  }
+
+  function handleDrop(targetRoundId: string) {
+    if (!draggedRound || draggedRound === targetRoundId) {
+      setDraggedRound(null)
+      return
+    }
+
+    const draggedIndex = orderedRounds.findIndex(r => r.id === draggedRound)
+    const targetIndex = orderedRounds.findIndex(r => r.id === targetRoundId)
+
+    if (draggedIndex === -1 || targetIndex === -1) {
+      setDraggedRound(null)
+      return
+    }
+
+    const newOrdered = [...orderedRounds]
+    const [removed] = newOrdered.splice(draggedIndex, 1)
+    newOrdered.splice(targetIndex, 0, removed)
+
+    setOrderedRounds(newOrdered)
+    setDraggedRound(null)
+    saveNewOrder(newOrdered)
+  }
+
+  async function saveNewOrder(newOrder: Round[]) {
+    setIsSaving(true)
+    setError(null)
+    const roundIds = newOrder.map(r => r.id)
+    const res = await reorderRounds(groupId, roundIds)
+    setIsSaving(false)
+
+    if (!res.success) {
+      setError(res.error ?? 'Erro ao salvar nova ordem')
+      // Reverter para ordem anterior em caso de erro
+      setOrderedRounds(
+        [...rounds].sort((a, b) => {
+          const aSort = a.sort_order ?? Number.MAX_VALUE
+          const bSort = b.sort_order ?? Number.MAX_VALUE
+          if (aSort !== bSort) return aSort - bSort
+          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        })
+      )
+    }
+  }
+
   if (rounds.length === 0) {
     return (
       <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 text-center">
@@ -71,17 +137,33 @@ export function RoundList({ groupId, rounds }: RoundListProps) {
         </div>
       )}
 
-      {[...rounds]
-        .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-        .map((round) => (
+      {isSaving && (
+        <div className="p-3 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-400/20 text-sm">
+          💾 Salvando nova ordem...
+        </div>
+      )}
+
+      <p className="text-xs text-gray-500 px-1">
+        🖱️ Arraste as rodadas para reordenar conforme os jogos ocorreram
+      </p>
+
+      {orderedRounds.map((round) => (
+        <div
+          key={round.id}
+          draggable
+          onDragStart={() => handleDragStart(round.id)}
+          onDragOver={handleDragOver}
+          onDrop={() => handleDrop(round.id)}
+          className={`cursor-move transition ${draggedRound === round.id ? 'opacity-50' : ''}`}
+        >
           <RoundCard
-            key={round.id}
             round={round}
             busy={busyRoundId === round.id}
             onClose={handleClose}
             onReopen={handleReopen}
           />
-        ))}
+        </div>
+      ))}
     </div>
   )
 }

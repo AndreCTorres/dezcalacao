@@ -345,3 +345,55 @@ export async function resetDraftForNewPhase(groupId: string) {
     return { success: false, error: `Erro ao resetar draft: ${error.message}` }
   }
 }
+
+/**
+ * Reordenar rodadas do grupo via drag-and-drop
+ * @param groupId ID do grupo
+ * @param roundIds Array ordenado de IDs de rodadas (nova ordem)
+ */
+export async function reorderRounds(groupId: string, roundIds: string[]) {
+  const supabase = await createActionClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    return { success: false, error: 'Não autenticado' }
+  }
+
+  const admin = supabaseAdmin()
+
+  // Verificar que é admin do grupo
+  const { data: group } = await admin
+    .from('groups')
+    .select('id')
+    .eq('id', groupId)
+    .eq('admin_id', user.id)
+    .single()
+
+  if (!group) {
+    return { success: false, error: 'Você não é admin deste grupo' }
+  }
+
+  try {
+    // Atualizar sort_order para cada rodada
+    for (let i = 0; i < roundIds.length; i++) {
+      const { error } = await admin
+        .from('rounds')
+        .update({ sort_order: i })
+        .eq('id', roundIds[i])
+        .eq('group_id', groupId)
+
+      if (error) {
+        console.error(`[Rounds] Erro ao reordenar rodada ${roundIds[i]}:`, error)
+        throw error
+      }
+    }
+
+    console.log(`[Rounds] ✓ Rodadas reordenadas para grupo ${groupId}`)
+    revalidatePath('/admin/rodadas')
+
+    return { success: true, message: 'Ordem dos jogos atualizada' }
+  } catch (error: any) {
+    console.error('[Rounds] Erro ao reordenar:', error.message)
+    return { success: false, error: `Erro ao reordenar rodadas: ${error.message}` }
+  }
+}

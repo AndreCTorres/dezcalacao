@@ -63,8 +63,9 @@ export default async function RoundRatingsPage({ params }: PageProps) {
   // Fixtures desta rodada com contagem de ratings
   const { data: allFixtures } = await admin
     .from('fixtures')
-    .select('id, home_team, away_team, label, status, home_goals, away_goals, kickoff')
+    .select('id, home_team, away_team, label, status, home_goals, away_goals, kickoff, sort_order')
     .eq('round_id', roundId)
+    .order('sort_order', { ascending: true, nullsFirst: false })
     .order('id', { ascending: true })
 
   // Para cada fixture, contar quantos jogadores têm nota
@@ -111,6 +112,12 @@ export default async function RoundRatingsPage({ params }: PageProps) {
       ratedCount: countByFixture[f.id] ?? 0,
     }))
     .sort((a: any, b: any) => {
+      // Prioridade: sort_order manual > kickoff > id
+      const aSort = a.sort_order ?? null
+      const bSort = b.sort_order ?? null
+      if (aSort !== null && bSort !== null) return aSort - bSort
+      if (aSort !== null) return -1
+      if (bSort !== null) return 1
       if (a.kickoff && b.kickoff) {
         return new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime()
       }
@@ -122,9 +129,25 @@ export default async function RoundRatingsPage({ params }: PageProps) {
     .select('team_name')
     .order('team_name', { ascending: true })
 
+  // Nomes exatamente como cadastrados em players.team_name (inglês/oficial)
+  // Estes são os únicos valores válidos — o datalist guia o admin para não digitar em português
+  const WORLD_CUP_TEAM_OPTIONS = [
+    'Algeria', 'Argentina', 'Australia', 'Austria', 'Belgium', 'Bosnia & Herzegovina',
+    'Brazil', 'Canada', 'Cape Verde Islands', 'Colombia', 'Congo DR', 'Croatia',
+    'Curaçao', 'Czech Republic', 'Ecuador', 'Egypt', 'England', 'France', 'Germany',
+    'Ghana', 'Haiti', 'Iraq', 'Ivory Coast', 'Japan', 'Jordan', 'Mexico', 'Morocco',
+    'Netherlands', 'New Zealand', 'Norway', 'Panama', 'Paraguay', 'Portugal',
+    'Qatar', 'Saudi Arabia', 'Scotland', 'Senegal', 'South Africa', 'South Korea',
+    'Spain', 'Sweden', 'Switzerland', 'Tunisia', 'Türkiye', 'Uruguay', 'USA', 'Uzbekistan',
+  ]
+
   const teamOptions = Array.from(
-    new Set((playerTeams ?? []).map((p: any) => p.team_name).filter(Boolean))
-  )
+    new Set([
+      ...WORLD_CUP_TEAM_OPTIONS,
+      ...(playerTeams ?? []).map((p: any) => p.team_name).filter(Boolean),
+      ...(allFixtures ?? []).flatMap((f: any) => [f.home_team, f.away_team]).filter(Boolean),
+    ])
+  ).sort((a, b) => a.localeCompare(b))
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-4 sm:p-8">

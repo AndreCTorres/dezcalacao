@@ -220,6 +220,516 @@ export async function upsertBatchRatings(
   return { success: true, inserted: rows.length }
 }
 
+export async function upsertManualRatingsByName(
+  roundId: string,
+  fixtureId: number,
+  entries: Array<{ name: string; team?: string; rating: number; minutes: number; playerId?: number }>,
+  teamHints: string[] = []
+) {
+  const supabase = await createActionClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) return { success: false, error: 'Nao autenticado' }
+
+  const admin = supabaseAdmin()
+
+  const { data: round } = await admin
+    .from('rounds')
+    .select('id, group_id, groups!inner(admin_id)')
+    .eq('id', roundId)
+    .single()
+
+  if (!round || (round.groups as any).admin_id !== user.id) {
+    return { success: false, error: 'Sem permissao' }
+  }
+
+  const { data: players } = await admin
+    .from('players')
+    .select('id, name, team_name, position')
+
+  if (!players || players.length === 0) {
+    return { success: false, error: 'Nenhum jogador cadastrado no banco' }
+  }
+
+  const { data: fixture } = await admin
+    .from('fixtures')
+    .select('home_team, away_team, label')
+    .eq('id', fixtureId)
+    .single()
+
+  const normalize = (value: string) =>
+    value
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9 ]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+
+  const TEAM_ALIASES: Record<string, string[]> = {
+    // Suíça
+    suica: ['switzerland', 'swiss', 'sui'],
+    switzerland: ['suica', 'swiss', 'sui'],
+    // Qatar / Catar
+    catar: ['qatar'],
+    qatar: ['catar'],
+    // Coreia do Sul
+    'coreia do sul': ['south korea', 'korea republic'],
+    'south korea': ['coreia do sul', 'korea republic'],
+    'korea republic': ['south korea', 'coreia do sul'],
+    // República Tcheca
+    'rep tcheca': ['czech republic', 'czechia'],
+    'republica tcheca': ['czech republic', 'czechia'],
+    'czech republic': ['rep tcheca', 'republica tcheca', 'czechia'],
+    czechia: ['czech republic', 'rep tcheca'],
+    // EUA
+    eua: ['usa', 'united states'],
+    usa: ['eua', 'united states'],
+    // Alemanha
+    alemanha: ['germany'],
+    germany: ['alemanha'],
+    // Brasil
+    brasil: ['brazil'],
+    brazil: ['brasil'],
+    // Japão
+    japao: ['japan'],
+    japan: ['japao'],
+    // Marrocos
+    marrocos: ['morocco'],
+    morocco: ['marrocos'],
+    // Curaçao
+    curacao: ['curacao'],
+    // Turquia
+    turquia: ['turkiye', 'turkey'],
+    turkey: ['turkiye', 'turquia'],
+    turkiye: ['turkey', 'turquia'],
+    // Bósnia
+    bosnia: ['bosnia & herzegovina', 'bosnia and herzegovina'],
+    'bosnia & herzegovina': ['bosnia', 'bosnia and herzegovina'],
+    'bosnia and herzegovina': ['bosnia', 'bosnia & herzegovina'],
+    // Holanda
+    holanda: ['netherlands'],
+    netherlands: ['holanda'],
+    // Costa do Marfim
+    'costa do marfim': ['ivory coast', 'cote d ivoire'],
+    'ivory coast': ['costa do marfim', 'cote d ivoire'],
+    // Equador
+    equador: ['ecuador'],
+    ecuador: ['equador'],
+    // Paraguai
+    paraguai: ['paraguay'],
+    paraguay: ['paraguai'],
+    // México
+    mexico: ['mexico'],
+    // África do Sul
+    'africa do sul': ['south africa'],
+    'south africa': ['africa do sul'],
+    // Cabo Verde
+    'cape verde': ['cape verde islands'],
+    'cape verde islands': ['cape verde', 'cabo verde'],
+    'cabo verde': ['cape verde islands', 'cape verde'],
+    // Congo
+    'dr congo': ['congo dr', 'democratic republic of the congo'],
+    'congo dr': ['dr congo', 'democratic republic of the congo'],
+    // Escócia
+    escocia: ['scotland'],
+    scotland: ['escocia'],
+    // Argélia
+    argelia: ['algeria'],
+    algeria: ['argelia'],
+    // Irã
+    iran: ['iran'],
+    // Nova Zelândia
+    'nova zelandia': ['new zealand'],
+    'new zealand': ['nova zelandia'],
+    // Uzbequistão
+    uzbequistao: ['uzbekistan'],
+    uzbekistan: ['uzbequistao'],
+    // Tunísia
+    tunisia: ['tunisia', 'tunis'],
+    // Egito
+    egito: ['egypt'],
+    egypt: ['egito'],
+    // Arábia Saudita
+    'arabia saudita': ['saudi arabia'],
+    'saudi arabia': ['arabia saudita'],
+    // Iraque
+    iraque: ['iraq'],
+    iraq: ['iraque'],
+    // Jordânia
+    jordania: ['jordan'],
+    jordan: ['jordania'],
+    // Noruega
+    noruega: ['norway'],
+    norway: ['noruega'],
+    // Croácia
+    croacia: ['croatia'],
+    croatia: ['croacia'],
+    // Espanha
+    espanha: ['spain'],
+    spain: ['espanha'],
+    // França
+    franca: ['france'],
+    france: ['franca'],
+    // Bélgica
+    belgica: ['belgium'],
+    belgium: ['belgica'],
+    // Suécia
+    suecia: ['sweden'],
+    sweden: ['suecia'],
+    // Inglaterra
+    inglaterra: ['england'],
+    england: ['inglaterra'],
+    // Gana
+    gana: ['ghana'],
+    ghana: ['gana'],
+    // Uruguai
+    uruguai: ['uruguay'],
+    uruguay: ['uruguai'],
+    // Colômbia
+    colombia: ['colombia'],
+  }
+
+  const teamVariants = (value?: string | null) => {
+    const base = normalize(value ?? '')
+    if (!base) return []
+    return Array.from(new Set([base, ...(TEAM_ALIASES[base] ?? [])].map(normalize)))
+  }
+
+  const teamsMatch = (playerTeam: string | null | undefined, expectedTeam: string | null | undefined) => {
+    const playerVariants = teamVariants(playerTeam)
+    const expectedVariants = teamVariants(expectedTeam)
+    if (playerVariants.length === 0 || expectedVariants.length === 0) return false
+    return playerVariants.some((playerVariant) =>
+      expectedVariants.some((expectedVariant) =>
+        playerVariant === expectedVariant ||
+        playerVariant.includes(expectedVariant) ||
+        expectedVariant.includes(playerVariant)
+      )
+    )
+  }
+
+  const initials = (value: string) =>
+    normalize(value)
+      .split(' ')
+      .filter(Boolean)
+      .map((part) => part[0])
+      .join('')
+
+  const tokens = (value: string) =>
+    normalize(value)
+      .split(' ')
+      .filter((part) => part.length > 1)
+
+  const lastToken = (value: string) => {
+    const parts = tokens(value)
+    return parts[parts.length - 1] ?? ''
+  }
+
+  const tokenScore = (source: string, target: string) => {
+    const srcTokens = new Set(tokens(source))
+    const targetTokens = new Set(tokens(target))
+    if (srcTokens.size === 0 || targetTokens.size === 0) return 0
+    let hits = 0
+    for (const token of srcTokens) {
+      if (targetTokens.has(token)) hits += 1
+    }
+    return hits / Math.max(srcTokens.size, targetTokens.size)
+  }
+
+  const hasStrongTokenMatch = (source: string, target: string) => {
+    const sourceTokens = tokens(source)
+    const targetTokens = tokens(target)
+    return sourceTokens.some((sourceToken) =>
+      sourceToken.length >= 4 &&
+      targetTokens.some((targetToken) =>
+        targetToken === sourceToken ||
+        targetToken.includes(sourceToken) ||
+        sourceToken.includes(targetToken)
+      )
+    )
+  }
+
+  const playerMap = new Map<string, any[]>()
+  for (const player of players as any[]) {
+    const key = normalize(player.name)
+    if (!playerMap.has(key)) playerMap.set(key, [])
+    playerMap.get(key)!.push(player)
+  }
+
+  const entryTeams = Array.from(new Set(entries.map((entry) => entry.team?.trim()).filter(Boolean))) as string[]
+  const fixtureTeams = Array.from(new Set([
+    fixture?.home_team,
+    fixture?.away_team,
+    ...teamHints,
+    ...entryTeams,
+  ].filter(Boolean))) as string[]
+  const fixturePlayers = fixtureTeams.length > 0
+    ? (players as any[]).filter((player) =>
+        fixtureTeams.some((team) => teamsMatch(player.team_name, team))
+      )
+    : (players as any[])
+
+  const scopedPlayersFor = (entryTeam?: string) => {
+    if (entryTeam?.trim()) {
+      const byEntryTeam = (players as any[]).filter((player) => teamsMatch(player.team_name, entryTeam))
+      if (byEntryTeam.length > 0) return byEntryTeam
+      if (fixturePlayers.length > 0) return fixturePlayers
+      return []
+    }
+    if (fixturePlayers.length > 0) return fixturePlayers
+    return players as any[]
+  }
+
+  const manualOptionsFor = (entryTeam?: string) => {
+    const byEntryTeam = entryTeam?.trim()
+      ? (players as any[]).filter((player) => teamsMatch(player.team_name, entryTeam))
+      : []
+    const source = fixturePlayers.length > 0
+      ? [...fixturePlayers, ...byEntryTeam]
+      : byEntryTeam.length > 0
+        ? byEntryTeam
+        : (players as any[])
+    return Array.from(new Map(source.map((player) => [player.id, player])).values())
+  }
+
+  const { data: aliases } = await admin
+    .from('player_name_aliases')
+    .select('alias, normalized_alias, team_name, normalized_team_name, player_id, players(id, name, team_name, position)')
+
+  const aliasMap = new Map<string, any>()
+  for (const alias of aliases ?? []) {
+    aliasMap.set(`${alias.normalized_alias}::${alias.normalized_team_name ?? ''}`, alias)
+  }
+
+  const aliasKeysFor = (name: string, team?: string) => {
+    const normalizedName = normalize(name)
+    const teamKeys = teamVariants(team)
+    return [
+      ...teamKeys.map((teamKey) => `${normalizedName}::${teamKey}`),
+      `${normalizedName}::`,
+    ]
+  }
+
+  const findAliasPlayer = (name: string, team?: string) => {
+    for (const key of aliasKeysFor(name, team)) {
+      const alias = aliasMap.get(key)
+      const player = Array.isArray(alias?.players) ? alias.players[0] : alias?.players
+      if (player) return player
+    }
+    return null
+  }
+
+  const saveAlias = async (entryName: string, entryTeam: string | undefined, player: any) => {
+    const normalizedAlias = normalize(entryName)
+    if (!normalizedAlias) return
+
+    const normalizedTeams = teamVariants(entryTeam)
+    const normalizedTeamName = normalizedTeams[0] ?? normalize(player.team_name ?? '')
+
+    await admin
+      .from('player_name_aliases')
+      .upsert(
+        {
+          alias: entryName,
+          normalized_alias: normalizedAlias,
+          team_name: entryTeam?.trim() || player.team_name || null,
+          normalized_team_name: normalizedTeamName || null,
+          player_id: player.id,
+          source: 'manual',
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'normalized_alias,normalized_team_name' }
+      )
+  }
+
+  const rows: Array<{
+    player_id: number
+    round_id: string
+    fixture_id: number
+    rating: number
+    minutes: number
+    lineup_role: 'starter' | 'substitute' | null
+    source: 'manual'
+    fetched_at: string
+  }> = []
+
+  const unmatched: string[] = []
+  const unmatchedDetails: Array<{
+    name: string
+    suggestions: Array<{
+      id: number
+      name: string
+      team: string
+      position: string
+    }>
+    options: Array<{
+      id: number
+      name: string
+      team: string
+      position: string
+    }>
+  }> = []
+
+  const distance = (a: string, b: string) => {
+    const s = normalize(a)
+    const t = normalize(b)
+    const dp = Array.from({ length: s.length + 1 }, () => Array(t.length + 1).fill(0))
+    for (let i = 0; i <= s.length; i++) dp[i][0] = i
+    for (let j = 0; j <= t.length; j++) dp[0][j] = j
+    for (let i = 1; i <= s.length; i++) {
+      for (let j = 1; j <= t.length; j++) {
+        dp[i][j] = Math.min(
+          dp[i - 1][j] + 1,
+          dp[i][j - 1] + 1,
+          dp[i - 1][j - 1] + (s[i - 1] === t[j - 1] ? 0 : 1)
+        )
+      }
+    }
+    return dp[s.length][t.length]
+  }
+
+  for (const entry of entries) {
+    const entryName = normalize(entry.name)
+    const entryTeam = normalize(entry.team ?? '')
+    const scopedPlayers = scopedPlayersFor(entry.team)
+    const explicitPlayer = entry.playerId
+      ? (players as any[]).find((player) => player.id === entry.playerId)
+      : null
+    const aliasPlayer = explicitPlayer ?? findAliasPlayer(entry.name, entry.team)
+
+    if (aliasPlayer) {
+      rows.push({
+        player_id: aliasPlayer.id,
+        round_id: roundId,
+        fixture_id: fixtureId,
+        rating: parseFloat(entry.rating.toFixed(2)),
+        minutes: entry.minutes,
+        lineup_role: null,
+        source: 'manual',
+        fetched_at: new Date().toISOString(),
+      })
+
+      if (explicitPlayer) {
+        await saveAlias(entry.name, entry.team, explicitPlayer)
+      }
+      continue
+    }
+
+    const candidates = (playerMap.get(entryName) ?? []).filter((player) =>
+      scopedPlayers.some((scopedPlayer) => scopedPlayer.id === player.id)
+    )
+    if (candidates.length === 0) {
+      const fuzzy = scopedPlayers
+        .map((player) => {
+          const playerName = normalize(player.name)
+          const playerTeam = normalize(player.team_name ?? '')
+          const overlap = tokenScore(entry.name, player.name)
+          const sharedStrongToken = hasStrongTokenMatch(entry.name, player.name)
+          const sameLastToken = lastToken(entry.name) && lastToken(entry.name) === lastToken(player.name)
+          const sameInitials = initials(player.name) === initials(entry.name)
+          const nameMatches =
+            playerName.includes(entryName) ||
+            entryName.includes(playerName) ||
+            sameLastToken ||
+            sharedStrongToken ||
+            overlap >= 0.4 ||
+            (sameInitials && overlap >= 0.2)
+          const teamMatches = !entryTeam || teamsMatch(playerTeam, entryTeam)
+          const score =
+            (nameMatches ? 2 : 0) +
+            (teamMatches ? 1 : 0) +
+            overlap * 4 +
+            (sharedStrongToken ? 2 : 0) +
+            (sameLastToken ? 1.5 : 0) +
+            (sameInitials ? 0.25 : 0) +
+            (playerName.startsWith(entryName) || entryName.startsWith(playerName) ? 0.5 : 0)
+          return { player, score, nameMatches, teamMatches }
+        })
+        .filter((item) => item.nameMatches && item.teamMatches)
+        .sort((a, b) => b.score - a.score)[0]?.player
+      if (fuzzy) {
+        rows.push({
+          player_id: fuzzy.id,
+          round_id: roundId,
+          fixture_id: fixtureId,
+          rating: parseFloat(entry.rating.toFixed(2)),
+          minutes: entry.minutes,
+          lineup_role: null,
+          source: 'manual',
+          fetched_at: new Date().toISOString(),
+        })
+      } else {
+        unmatched.push(entry.name)
+        const playerOptions = manualOptionsFor()
+          .map((player) => ({
+            id: player.id as number,
+            name: player.name as string,
+            team: (player.team_name as string) ?? '',
+            position: (player.position as string) ?? '',
+          }))
+          .sort((a, b) =>
+            a.team.localeCompare(b.team) ||
+            a.position.localeCompare(b.position) ||
+            a.name.localeCompare(b.name)
+          )
+        const suggestions = scopedPlayers
+          .map((player) => ({
+            id: player.id as number,
+            name: player.name as string,
+            team: (player.team_name as string) ?? '',
+            position: (player.position as string) ?? '',
+            score:
+              distance(entry.name, player.name) -
+              (entryTeam && teamsMatch(player.team_name, entryTeam) ? 3 : 0) -
+              tokenScore(entry.name, player.name) * 4 -
+              (hasStrongTokenMatch(entry.name, player.name) ? 3 : 0) -
+              (lastToken(entry.name) && lastToken(entry.name) === lastToken(player.name) ? 2 : 0),
+          }))
+          .sort((a, b) => a.score - b.score)
+          .slice(0, 3)
+          .map(({ score, ...item }) => item)
+        unmatchedDetails.push({ name: entry.name, suggestions, options: playerOptions })
+      }
+      continue
+    }
+
+    const chosen =
+      candidates.find((p) => entryTeam && teamsMatch(p.team_name, entryTeam)) ??
+      candidates.find((p) => hasStrongTokenMatch(entry.name, p.name)) ??
+      candidates.find((p) => lastToken(entry.name) && lastToken(entry.name) === lastToken(p.name)) ??
+      candidates.find((p) => tokenScore(entry.name, p.name) >= 0.4) ??
+      candidates.find((p) => initials(p.name) === initials(entry.name) && tokenScore(entry.name, p.name) >= 0.2) ??
+      candidates.find((p) => p.team_name) ??
+      candidates[0]
+    rows.push({
+      player_id: chosen.id,
+      round_id: roundId,
+      fixture_id: fixtureId,
+      rating: parseFloat(entry.rating.toFixed(2)),
+      minutes: entry.minutes,
+      lineup_role: null,
+      source: 'manual',
+      fetched_at: new Date().toISOString(),
+    })
+  }
+
+  if (rows.length === 0) {
+    return { success: false, error: 'Nao achei nenhum jogador correspondente.', unmatched, unmatchedDetails }
+  }
+
+  const { error } = await admin
+    .from('player_round_ratings')
+    .upsert(rows, { onConflict: 'player_id,round_id' })
+
+  if (error) {
+    return { success: false, error: error.message, unmatched, unmatchedDetails }
+  }
+
+  revalidatePath(`/admin/rodadas/${roundId}`)
+  revalidatePath('/app')
+  return { success: true, inserted: rows.length, unmatched, unmatchedDetails }
+}
+
 /**
  * Atualizar placar de um fixture
  */
@@ -263,6 +773,60 @@ export async function updateFixtureScore(
   return { success: true }
 }
 
+export async function updateFixtureTeams(
+  fixtureId: number,
+  roundId: string,
+  homeTeam: string,
+  awayTeam: string
+) {
+  const supabase = await createActionClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) return { success: false, error: 'Nao autenticado' }
+
+  const cleanHome = homeTeam.trim()
+  const cleanAway = awayTeam.trim()
+
+  if (!cleanHome || !cleanAway) {
+    return { success: false, error: 'Informe mandante e visitante.' }
+  }
+
+  if (cleanHome === cleanAway) {
+    return { success: false, error: 'Mandante e visitante precisam ser diferentes.' }
+  }
+
+  const admin = supabaseAdmin()
+
+  const { data: round } = await admin
+    .from('rounds')
+    .select('id, group_id, groups!inner(admin_id)')
+    .eq('id', roundId)
+    .single()
+
+  if (!round || (round.groups as any).admin_id !== user.id) {
+    return { success: false, error: 'Sem permissao' }
+  }
+
+  const { data: fixture, error } = await admin
+    .from('fixtures')
+    .update({
+      home_team: cleanHome,
+      away_team: cleanAway,
+      label: `${cleanHome} x ${cleanAway}`,
+    })
+    .eq('id', fixtureId)
+    .eq('round_id', roundId)
+    .select('id, home_team, away_team, label, home_goals, away_goals')
+    .single()
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  revalidatePath(`/admin/rodadas/${roundId}`)
+  revalidatePath('/app')
+  return { success: true, fixture }
+}
+
 /**
  * Recalcular pontuação da rodada após inserir/editar ratings
  * Chama o motor de scoring já existente
@@ -296,6 +860,45 @@ export async function recalculateRound(groupId: string, roundId: string) {
   } catch (err: any) {
     return { success: false, error: err.message }
   }
+}
+
+/**
+ * Reordenar jogos dentro de uma rodada via drag-and-drop
+ * @param roundId ID da rodada
+ * @param fixtureIds Array ordenado de IDs de fixtures (nova ordem)
+ */
+export async function reorderFixtures(roundId: string, fixtureIds: number[]) {
+  const supabase = await createActionClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) return { success: false, error: 'Não autenticado' }
+
+  const admin = supabaseAdmin()
+
+  const { data: round } = await admin
+    .from('rounds')
+    .select('id, group_id, groups!inner(admin_id)')
+    .eq('id', roundId)
+    .single()
+
+  if (!round || (round.groups as any).admin_id !== user.id) {
+    return { success: false, error: 'Sem permissão' }
+  }
+
+  for (let i = 0; i < fixtureIds.length; i++) {
+    const { error } = await admin
+      .from('fixtures')
+      .update({ sort_order: i })
+      .eq('id', fixtureIds[i])
+      .eq('round_id', roundId)
+
+    if (error) {
+      console.error(`[Fixtures] Erro ao reordenar fixture ${fixtureIds[i]}:`, error)
+      return { success: false, error: error.message }
+    }
+  }
+
+  revalidatePath(`/admin/rodadas/${roundId}`)
+  return { success: true }
 }
 
 export async function toggleRoundFinalized(roundId: string, finalized: boolean) {

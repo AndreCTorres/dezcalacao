@@ -8,11 +8,16 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ groupId: string }> }
 ) {
-  const { groupId: roundId } = await params
+  const { groupId } = await params
   const fixtureId = req.nextUrl.searchParams.get('fixtureId')
+  const roundId = req.nextUrl.searchParams.get('roundId')
 
   if (!fixtureId) {
     return NextResponse.json({ error: 'fixtureId obrigatorio' }, { status: 400 })
+  }
+
+  if (!roundId) {
+    return NextResponse.json({ error: 'roundId obrigatorio' }, { status: 400 })
   }
 
   const admin = supabaseAdmin()

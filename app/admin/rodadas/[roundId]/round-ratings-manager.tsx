@@ -4,7 +4,7 @@
 // Fluxo manual: cria jogos, edita notas por partida e recalcula a rodada.
 
 import { useState, useTransition } from 'react'
-import { createManualFixture, upsertBatchRatings, recalculateRound, updateFixtureScore } from './actions'
+import { createManualFixture, upsertBatchRatings, upsertManualRatingsByName, recalculateRound, updateFixtureScore, updateFixtureTeams, reorderFixtures } from './actions'
 
 type Fixture = {
   id: number
@@ -90,15 +90,149 @@ function parseRatingLine(line: string) {
   return { name, rating, minutes }
 }
 
+type ManualSuggestion = {
+  id: number
+  name: string
+  team: string
+  position: string
+}
+
+type ManualUnmatchedDetail = {
+  name: string
+  suggestions: ManualSuggestion[]
+  options?: ManualSuggestion[]
+}
+
+function parseManualBulkInput(text: string) {
+  const trimmed = text.trim()
+
+  if (!trimmed) {
+    return {
+      entries: [] as Array<{ name: string; team?: string; rating: number; minutes: number }>,
+      unmatched: [] as string[],
+      teamHints: [] as string[],
+    }
+  }
+
+  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(trimmed)
+      const sourcePlayers = Array.isArray(parsed)
+        ? parsed
+        : Array.isArray(parsed?.players)
+          ? parsed.players
+          : []
+      const teamHints = Array.from(new Set([
+        parsed?.fixture?.homeTeam,
+        parsed?.fixture?.awayTeam,
+        parsed?.fixture?.home_team,
+        parsed?.fixture?.away_team,
+      ].map((value) => String(value ?? '').trim()).filter(Boolean)))
+
+      const entries = sourcePlayers
+        .map((item: any) => ({
+          name: String(item?.name ?? '').trim(),
+          team: String(item?.team ?? item?.team_name ?? '').trim(),
+          rating: Number(item?.rating),
+          minutes: Number(item?.minutes ?? 90),
+        }))
+        .filter((item: any) => item.name && Number.isFinite(item.rating))
+
+      return { entries, unmatched: [] as string[], teamHints }
+    } catch {
+      // cai para o modo linha-a-linha
+    }
+  }
+
+  const entries: Array<{ name: string; team?: string; rating: number; minutes: number }> = []
+  const unmatched: string[] = []
+
+  for (const line of trimmed.split(/\r?\n/)) {
+    const parsed = parseRatingLine(line)
+    if (!parsed) {
+      unmatched.push(line)
+      continue
+    }
+    entries.push({
+      name: parsed.name,
+      team: '',
+      rating: parsed.rating,
+      minutes: parsed.minutes ?? 90,
+    })
+  }
+
+  return { entries, unmatched, teamHints: [] as string[] }
+}
+
+type ManualEntry = ReturnType<typeof parseManualBulkInput>['entries'][number]
+
+function correctionKey(name: string, team?: string) {
+  return `${normalizeText(name)}::${normalizeText(team ?? '')}`
+}
+
+function nameTokens(value: string) {
+  return normalizeText(value).split(' ').filter((part) => part.length > 1)
+}
+
+function hasCompatibleName(source: string, candidate: string) {
+  const sourceName = normalizeText(source)
+  const candidateName = normalizeText(candidate)
+  if (candidateName === sourceName || candidateName.includes(sourceName) || sourceName.includes(candidateName)) {
+    return true
+  }
+
+  const sourceTokens = nameTokens(source)
+  const candidateTokens = nameTokens(candidate)
+  const sourceLast = sourceTokens[sourceTokens.length - 1]
+  const candidateLast = candidateTokens[candidateTokens.length - 1]
+
+  if (sourceLast && candidateLast && sourceLast === candidateLast) return true
+
+  return sourceTokens.some((sourceToken) =>
+    sourceToken.length >= 4 &&
+    candidateTokens.some((candidateToken) =>
+      candidateToken === sourceToken ||
+      candidateToken.includes(sourceToken) ||
+      sourceToken.includes(candidateToken)
+    )
+  )
+}
+
+function applyDetectedFixtureTeams(
+  text: string,
+  currentTeams: { home_team: string; away_team: string },
+  validTeams: string[]
+) {
+  const parsed = parseManualBulkInput(text)
+  if (parsed.teamHints.length < 2) return currentTeams
+
+  const [homeTeam, awayTeam] = parsed.teamHints
+  const homeIsValid = validTeams.includes(currentTeams.home_team)
+  const awayIsValid = validTeams.includes(currentTeams.away_team)
+
+  return {
+    home_team: homeIsValid ? currentTeams.home_team : homeTeam,
+    away_team: awayIsValid ? currentTeams.away_team : awayTeam,
+  }
+}
+
 export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }: Props) {
   const [fixtureList, setFixtureList] = useState(fixtures)
+  const [draggedFixtureId, setDraggedFixtureId] = useState<number | null>(null)
+  const [isSavingOrder, setIsSavingOrder] = useState(false)
   const [selectedFixture, setSelectedFixture] = useState<Fixture | null>(null)
   const [players, setPlayers] = useState<PlayerRating[]>([])
   const [localRatings, setLocalRatings] = useState<Record<number, { rating: string; minutes: string }>>({})
-  const [lineupOverrides, setLineupOverrides] = useState<Record<number, 'starter' | 'substitute'>>({})
+  const [committedRatings, setCommittedRatings] = useState<Record<number, { rating: string; minutes: string }>>({})
+  const [lineupOverrides, setLineupOverrides] = useState<Record<number, 'starter' | 'substitute' | 'not_played'>>({})
+  const [fixtureTeams, setFixtureTeams] = useState({ home_team: '', away_team: '' })
   const [fixtureScore, setFixtureScore] = useState({ home_goals: '', away_goals: '' })
   const [bulkText, setBulkText] = useState('')
   const [bulkResult, setBulkResult] = useState<{ matched: number; unmatched: string[] } | null>(null)
+  const [manualBulkText, setManualBulkText] = useState('')
+  const [manualBulkResult, setManualBulkResult] = useState<{ matched: number; unmatched: string[]; unmatchedDetails?: ManualUnmatchedDetail[] } | null>(null)
+  const [manualCorrections, setManualCorrections] = useState<Record<string, ManualSuggestion>>({})
+  const [savingManualBulk, setSavingManualBulk] = useState(false)
   const [loadingPlayers, setLoadingPlayers] = useState(false)
   const [savingFixture, setSavingFixture] = useState(false)
   const [creatingFixture, startCreateFixture] = useTransition()
@@ -122,15 +256,23 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
       home_goals: fixture.home_goals !== null && fixture.home_goals !== undefined ? String(fixture.home_goals) : '',
       away_goals: fixture.away_goals !== null && fixture.away_goals !== undefined ? String(fixture.away_goals) : '',
     })
+    setFixtureTeams({
+      home_team: fixture.home_team,
+      away_team: fixture.away_team,
+    })
     setLoadingPlayers(true)
     setPlayers([])
     setLocalRatings({})
+    setCommittedRatings({})
     setLineupOverrides({})
     setBulkText('')
     setBulkResult(null)
+    setManualBulkText('')
+    setManualBulkResult(null)
+    setManualCorrections({})
 
     try {
-      const res = await fetch(`/api/rounds/${roundId}/fixture-players?fixtureId=${fixture.id}`)
+      const res = await fetch(`/api/rounds/${groupId}/fixture-players?fixtureId=${fixture.id}&roundId=${roundId}`)
       if (!res.ok) {
         setFeedback({ type: 'error', msg: 'Nao foi possivel carregar os jogadores deste jogo.' })
         return
@@ -152,6 +294,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
         }
       })
       setLocalRatings(initial)
+      setCommittedRatings(initial)
       setLineupOverrides(initialOverrides)
     } catch {
       setFeedback({ type: 'error', msg: 'Erro ao carregar jogadores.' })
@@ -163,6 +306,15 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
   function parseLocalRatings() {
     const parsed = players.map((player) => {
       const val = localRatings[player.id] ?? { rating: '', minutes: '0' }
+      const override = lineupOverrides[player.id]
+      if (override === 'not_played') {
+        return {
+          playerId: player.id,
+          rating: null,
+          minutes: 0,
+          lineupRole: null,
+        }
+      }
       const rating = val.rating.trim() === '' ? null : Number(val.rating.replace(',', '.'))
       const minutes = rating === null ? 0 : Number.parseInt(val.minutes, 10)
 
@@ -170,7 +322,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
         playerId: player.id,
         rating,
         minutes: Number.isFinite(minutes) ? minutes : 0,
-        lineupRole: rating === null ? null : lineupOverrides[player.id] ?? null,
+        lineupRole: rating === null ? null : (override === 'starter' || override === 'substitute' ? override : null),
       }
     })
 
@@ -185,16 +337,47 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
     return parsed
   }
 
+  function getCommittedValue(playerId: number) {
+    return committedRatings[playerId] ?? { rating: '', minutes: '0' }
+  }
+
+  function updateLocalPlayerValue(playerId: number, field: 'rating' | 'minutes', value: string) {
+    setLocalRatings(prev => ({
+      ...prev,
+      [playerId]: {
+        ...(prev[playerId] ?? getCommittedValue(playerId)),
+        [field]: value,
+      },
+    }))
+  }
+
+  function commitPlayerValue(playerId: number) {
+    setCommittedRatings(prev => ({
+      ...prev,
+      [playerId]: localRatings[playerId] ?? prev[playerId] ?? { rating: '', minutes: '0' },
+    }))
+  }
+
   function isParticipating(player: PlayerRating) {
-    const val = localRatings[player.id]
+    if (lineupOverrides[player.id] === 'not_played') return false
+    const val = committedRatings[player.id]
     if (!val?.rating.trim()) return false
     const minutes = Number.parseInt(val.minutes || '0', 10)
     return Number.isFinite(minutes) && minutes > 0
   }
 
   function getPlayerMinutes(player: PlayerRating) {
-    const minutes = Number.parseInt(localRatings[player.id]?.minutes || '0', 10)
+    const minutes = Number.parseInt(committedRatings[player.id]?.minutes || '0', 10)
     return Number.isFinite(minutes) ? minutes : 0
+  }
+
+  function sortPlayersByPosition(a: PlayerRating, b: PlayerRating) {
+    const posOrder: Record<string, number> = { GK: 0, ZAG: 1, LAT: 2, MEI: 3, ATK: 4 }
+    const posA = posOrder[a.position] ?? 99
+    const posB = posOrder[b.position] ?? 99
+    return posA - posB ||
+      getPlayerMinutes(b) - getPlayerMinutes(a) ||
+      a.name.localeCompare(b.name)
   }
 
   function getTeamLineup(teamPlayers: PlayerRating[]) {
@@ -214,9 +397,9 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
     ]
 
     return {
-      starters,
-      substitutes,
-      notPlayed: teamPlayers.filter(player => !isParticipating(player)),
+      starters: [...starters].sort(sortPlayersByPosition),
+      substitutes: [...substitutes].sort(sortPlayersByPosition),
+      notPlayed: teamPlayers.filter(player => !isParticipating(player) || lineupOverrides[player.id] === 'not_played').sort(sortPlayersByPosition),
       participating,
     }
   }
@@ -225,7 +408,31 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
     return Math.max(0, 90 - minutesPlayed)
   }
 
-  function setPlayerLineupRole(playerId: number, role: 'starter' | 'substitute') {
+  function setPlayerLineupRole(playerId: number, role: 'auto' | 'starter' | 'substitute' | 'not_played') {
+    if (role === 'auto') {
+      setCommittedRatings(prev => ({
+        ...prev,
+        [playerId]: localRatings[playerId] ?? prev[playerId] ?? { rating: '', minutes: '0' },
+      }))
+      setLineupOverrides(prev => {
+        const next = { ...prev }
+        delete next[playerId]
+        return next
+      })
+      return
+    }
+
+    if (role === 'not_played') {
+      const cleared = { rating: '', minutes: '0' }
+      setLocalRatings(prev => ({ ...prev, [playerId]: cleared }))
+      setCommittedRatings(prev => ({ ...prev, [playerId]: cleared }))
+    } else {
+      setCommittedRatings(prev => ({
+        ...prev,
+        [playerId]: localRatings[playerId] ?? prev[playerId] ?? { rating: '', minutes: '0' },
+      }))
+    }
+
     setLineupOverrides(prev => ({ ...prev, [playerId]: role }))
   }
 
@@ -258,6 +465,26 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
     
     // Salvar ratings
     const ratingsResult = await upsertBatchRatings(roundId, selectedFixture.id, parsed)
+    let fixtureTeamUpdate: Awaited<ReturnType<typeof updateFixtureTeams>> | null = null
+    const teamsChanged =
+      fixtureTeams.home_team.trim() !== selectedFixture.home_team ||
+      fixtureTeams.away_team.trim() !== selectedFixture.away_team
+
+    if (teamsChanged) {
+      fixtureTeamUpdate = await updateFixtureTeams(
+        selectedFixture.id,
+        roundId,
+        fixtureTeams.home_team,
+        fixtureTeams.away_team
+      )
+
+      if (!fixtureTeamUpdate.success) {
+        setFeedback({ type: 'error', msg: fixtureTeamUpdate.error ?? 'Nao foi possivel atualizar os times do jogo.' })
+        setSavingFixture(false)
+        return
+      }
+    }
+
     const homeGoals = fixtureScore.home_goals.trim() !== '' ? parseInt(fixtureScore.home_goals, 10) : null
     const awayGoals = fixtureScore.away_goals.trim() !== '' ? parseInt(fixtureScore.away_goals, 10) : null
     
@@ -280,24 +507,47 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
     }
 
     const ratedCount = parsed.filter(r => r.rating !== null).length
+    const updatedHomeTeam = fixtureTeamUpdate?.fixture?.home_team ?? selectedFixture.home_team
+    const updatedAwayTeam = fixtureTeamUpdate?.fixture?.away_team ?? selectedFixture.away_team
+    const updatedLabel = fixtureTeamUpdate?.fixture?.label ?? selectedFixture.label
     setFixtureRatedCounts(prev => ({ ...prev, [selectedFixture.id]: ratedCount }))
     setFixtureList(prev => prev.map(f => (
       f.id === selectedFixture.id
-        ? { ...f, home_goals: homeGoals, away_goals: awayGoals }
+        ? {
+            ...f,
+            home_team: updatedHomeTeam,
+            away_team: updatedAwayTeam,
+            label: updatedLabel,
+            home_goals: homeGoals,
+            away_goals: awayGoals,
+          }
         : f
     )))
-    setSelectedFixture(prev => prev ? { ...prev, home_goals: homeGoals, away_goals: awayGoals } : prev)
+    setSelectedFixture(prev => prev ? {
+      ...prev,
+      home_team: updatedHomeTeam,
+      away_team: updatedAwayTeam,
+      label: updatedLabel,
+      home_goals: homeGoals,
+      away_goals: awayGoals,
+    } : prev)
     setFeedback({ type: 'success', msg: `${ratedCount} notas salvas para este jogo.` })
     setTimeout(() => setFeedback(null), 2500)
   }
 
   function applyBulkText() {
-    const lines = bulkText
-      .split(/\r?\n/)
-      .map(line => line.trim())
-      .filter(Boolean)
+    const parsedBulk = parseManualBulkInput(bulkText)
+    const parsedJsonEntries = bulkText.trim().startsWith('{') || bulkText.trim().startsWith('[')
+      ? parsedBulk.entries
+      : []
+    const lines = parsedJsonEntries.length > 0
+      ? []
+      : bulkText
+          .split(/\r?\n/)
+          .map(line => line.trim())
+          .filter(Boolean)
 
-    if (lines.length === 0) {
+    if (lines.length === 0 && parsedJsonEntries.length === 0) {
       setBulkResult({ matched: 0, unmatched: [] })
       return
     }
@@ -307,20 +557,29 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
     const unmatched: string[] = []
     let matched = 0
 
-    for (const line of lines) {
-      const parsed = parseRatingLine(line)
+    const entriesToApply = parsedJsonEntries.length > 0
+      ? parsedJsonEntries
+      : lines.map((line) => {
+          const parsed = parseRatingLine(line)
+          return parsed ? { ...parsed, team: '' } : { line }
+        })
+
+    for (const entry of entriesToApply) {
+      if ('line' in entry) {
+        unmatched.push(entry.line)
+        continue
+      }
+
+      const parsed = entry
       if (!parsed) {
-        unmatched.push(line)
         continue
       }
 
       const targetName = normalizeText(parsed.name)
       const player = players.find((candidate) => {
         if (usedPlayerIds.has(candidate.id)) return false
-        const candidateName = normalizeText(candidate.name)
-        return candidateName === targetName ||
-          candidateName.includes(targetName) ||
-          targetName.includes(candidateName)
+        if (parsed.team && normalizeText(candidate.team_name) !== normalizeText(parsed.team)) return false
+        return hasCompatibleName(parsed.name, candidate.name)
       })
 
       if (!player) {
@@ -339,7 +598,132 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
     }
 
     setLocalRatings(nextRatings)
+    setCommittedRatings(nextRatings)
     setBulkResult({ matched, unmatched })
+  }
+
+  async function saveManualBulkText() {
+    if (!selectedFixture) return
+
+    const { entries, unmatched, teamHints } = parseManualBulkInput(manualBulkText)
+    
+    // Aplicar aliases aos teamHints detectados do JSON
+    const correctedTeamHints = teamHints.map(hint => {
+      const normalized = hint
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9 ]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+      
+      // Mapeamento hardcoded de correções comuns para hints detectados do JSON
+      const corrections: Record<string, string> = {
+        'cape verde': 'Cape Verde Islands',
+        'capeverde': 'Cape Verde Islands',
+      }
+      
+      const corrected = corrections[normalized]
+      return corrected || hint
+    })
+    
+    const parsedEntries: Array<ManualEntry & { playerId?: number }> = entries.map((entry) => {
+      const correction = manualCorrections[correctionKey(entry.name, entry.team)]
+      return correction ? { ...entry, playerId: correction.id } : entry
+    })
+
+    if (parsedEntries.length === 0) {
+      setManualBulkResult({ matched: 0, unmatched, unmatchedDetails: [] })
+      return
+    }
+
+    setSavingManualBulk(true)
+    const result = await upsertManualRatingsByName(roundId, selectedFixture.id, parsedEntries, correctedTeamHints)
+    setSavingManualBulk(false)
+
+    if (!result.success) {
+      setManualBulkResult({
+        matched: 0,
+        unmatched: [...unmatched, ...(result.unmatched ?? [])],
+        unmatchedDetails: result.unmatchedDetails ?? [],
+      })
+      setFeedback({ type: 'error', msg: result.error ?? 'Nao foi possivel salvar as notas manuais.' })
+      return
+    }
+
+    const totalMatched = (result.inserted ?? 0)
+    setManualBulkResult({
+      matched: totalMatched,
+      unmatched: [...unmatched, ...(result.unmatched ?? [])],
+      unmatchedDetails: result.unmatchedDetails ?? [],
+    })
+    setFeedback({
+      type: 'success',
+      msg: `${totalMatched} notas salvas no modo manual.`,
+    })
+    setTimeout(() => setFeedback(null), 2500)
+  }
+
+  function applyManualSuggestion(sourceName: string, suggestion: ManualSuggestion) {
+    const confirmed = window.confirm(
+      `Trocar "${sourceName}" por "${suggestion.name}"?\n${suggestion.position} · ${suggestion.team || 'sem time'}`
+    )
+    if (!confirmed) return
+
+    const escaped = sourceName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const nextText = manualBulkText.replace(new RegExp(escaped, 'g'), suggestion.name)
+    const { entries } = parseManualBulkInput(manualBulkText)
+    const sourceEntry = entries.find(entry => entry.name === sourceName)
+    setManualCorrections(prev => ({
+      ...prev,
+      [correctionKey(sourceName, sourceEntry?.team)]: suggestion,
+      [correctionKey(suggestion.name, sourceEntry?.team)]: suggestion,
+    }))
+    setManualBulkText(nextText)
+  }
+
+  async function saveFixtureTeamsOnly() {
+    if (!selectedFixture) return
+
+    setSavingFixture(true)
+    const result = await updateFixtureTeams(
+      selectedFixture.id,
+      roundId,
+      fixtureTeams.home_team,
+      fixtureTeams.away_team
+    )
+    setSavingFixture(false)
+
+    if (!result.success || !result.fixture) {
+      setFeedback({ type: 'error', msg: result.error ?? 'Nao foi possivel atualizar os times do jogo.' })
+      return
+    }
+
+    const updatedFixture = {
+      ...selectedFixture,
+      home_team: result.fixture.home_team,
+      away_team: result.fixture.away_team,
+      label: result.fixture.label,
+    }
+
+    setFixtureList(prev => prev.map(f => (
+      f.id === selectedFixture.id ? { ...f, ...updatedFixture } : f
+    )))
+    setSelectedFixture(updatedFixture)
+    setFeedback({ type: 'success', msg: 'Times do jogo atualizados.' })
+    setTimeout(() => setFeedback(null), 2500)
+    await openFixture(updatedFixture)
+  }
+
+  function ignoreManualUnmatched(sourceName: string) {
+    setManualBulkResult(prev => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        unmatched: prev.unmatched.filter(name => name !== sourceName),
+        unmatchedDetails: prev.unmatchedDetails?.filter(item => item.name !== sourceName) ?? [],
+      }
+    })
   }
 
   function handleCreateFixture() {
@@ -376,6 +760,47 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
       })
       setTimeout(() => setFeedback(null), 2500)
     })
+  }
+
+  function handleDragFixtureStart(fixtureId: number) {
+    setDraggedFixtureId(fixtureId)
+  }
+
+  function handleDragFixtureOver(e: React.DragEvent) {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+  }
+
+  function handleDropFixture(targetFixtureId: number) {
+    if (!draggedFixtureId || draggedFixtureId === targetFixtureId) {
+      setDraggedFixtureId(null)
+      return
+    }
+
+    const draggedIndex = fixtureList.findIndex(f => f.id === draggedFixtureId)
+    const targetIndex = fixtureList.findIndex(f => f.id === targetFixtureId)
+
+    if (draggedIndex === -1 || targetIndex === -1) {
+      setDraggedFixtureId(null)
+      return
+    }
+
+    const newList = [...fixtureList]
+    const [removed] = newList.splice(draggedIndex, 1)
+    newList.splice(targetIndex, 0, removed)
+
+    setFixtureList(newList)
+    setDraggedFixtureId(null)
+    saveFixtureOrder(newList)
+  }
+
+  async function saveFixtureOrder(newList: Fixture[]) {
+    setIsSavingOrder(true)
+    const result = await reorderFixtures(roundId, newList.map(f => f.id))
+    setIsSavingOrder(false)
+    if (!result.success) {
+      setFeedback({ type: 'error', msg: result.error ?? 'Erro ao salvar ordem dos jogos' })
+    }
   }
 
   function handleRecalc() {
@@ -494,90 +919,122 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
         </div>
       )}
 
+      {fixtureList.length > 0 && isSavingOrder && (
+        <div className="p-2 text-xs text-blue-400 text-center">💾 Salvando ordem...</div>
+      )}
+
+      {fixtureList.length > 0 && (
+        <p className="text-xs text-gray-500 px-1">
+          ⠿ Arraste os jogos para reordenar conforme aconteceram
+        </p>
+      )}
+
       {fixtureList.map((fixture) => {
         const count = fixtureRatedCounts[fixture.id] ?? 0
         const hasRatings = count > 0
         const hasScore = hasFixtureScore(fixture)
         const hasPartialScore = hasPartialFixtureScore(fixture)
         const kickoffDate = fixture.kickoff ? new Date(fixture.kickoff) : null
+        const isDragging = draggedFixtureId === fixture.id
 
         return (
-          <button
+          <div
             key={fixture.id}
-            onClick={() => openFixture(fixture)}
-            className="w-full text-left bg-gray-800 hover:bg-gray-700/80 border border-gray-700 hover:border-lime-500/40 rounded-xl p-4 transition group"
+            draggable
+            onDragStart={() => handleDragFixtureStart(fixture.id)}
+            onDragOver={handleDragFixtureOver}
+            onDrop={() => handleDropFixture(fixture.id)}
+            className={`flex items-stretch gap-0 transition ${isDragging ? 'opacity-40 scale-95' : ''}`}
           >
-            <div className="mb-3 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-              <p className="truncate text-right text-sm font-bold text-white group-hover:text-lime-300 transition">
-                {fixture.home_team}
-              </p>
-              <div className={`rounded-xl border px-3 py-2 min-w-24 text-center ${
-                hasScore
-                  ? 'bg-lime-400/10 border-lime-400/30'
-                  : hasPartialScore
-                    ? 'bg-orange-400/10 border-orange-400/30'
-                    : 'bg-gray-900/70 border-gray-600'
-              }`}>
-                <div className="flex items-center justify-center gap-2 font-mono font-black text-lg">
-                  <span className={hasScore || hasPartialScore ? 'text-white' : 'text-gray-500'}>
-                    {fixture.home_goals ?? '-'}
-                  </span>
-                  <span className="text-xs text-gray-500">x</span>
-                  <span className={hasScore || hasPartialScore ? 'text-white' : 'text-gray-500'}>
-                    {fixture.away_goals ?? '-'}
-                  </span>
-                </div>
-                <span className={`mt-1 inline-block text-[10px] font-bold uppercase tracking-wide ${
-                  hasScore ? 'text-lime-300' : hasPartialScore ? 'text-orange-300' : 'text-yellow-300'
-                }`}>
-                  {hasScore ? 'Placar ok' : hasPartialScore ? 'Parcial' : 'Pendente'}
-                </span>
-              </div>
-              <p className="truncate text-left text-sm font-bold text-white group-hover:text-lime-300 transition">
-                {fixture.away_team}
-              </p>
+            {/* Handle de drag */}
+            <div
+              className="flex items-center px-2 cursor-grab active:cursor-grabbing text-gray-600 hover:text-gray-400 bg-gray-800 border border-r-0 border-gray-700 rounded-l-xl transition"
+              title="Arrastar para reordenar"
+            >
+              <svg width="12" height="20" viewBox="0 0 12 20" fill="currentColor">
+                <circle cx="4" cy="4" r="1.5"/>
+                <circle cx="8" cy="4" r="1.5"/>
+                <circle cx="4" cy="10" r="1.5"/>
+                <circle cx="8" cy="10" r="1.5"/>
+                <circle cx="4" cy="16" r="1.5"/>
+                <circle cx="8" cy="16" r="1.5"/>
+              </svg>
             </div>
-            <div className="flex items-center justify-between gap-4">
-              {/* Time e resultado */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-3 flex-wrap">
-                  <p className="font-semibold text-white text-base group-hover:text-lime-300 transition">
-                    {fixture.label || `${fixture.home_team} x ${fixture.away_team}`}
-                  </p>
-                  {hasScore && (
-                    <span className="text-sm font-bold text-lime-300 px-2 py-0.5 bg-lime-500/10 rounded">
-                      {fixture.home_goals} x {fixture.away_goals}
-                    </span>
-                  )}
-                </div>
-                <div className="text-xs text-gray-500 mt-1 flex items-center gap-2">
-                  <span>{fixture.home_team} x {fixture.away_team}</span>
-                  {kickoffDate && (
-                    <span className="text-gray-600">
-                      • {kickoffDate.toLocaleDateString('pt-BR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  )}
-                </div>
-              </div>
 
-              {/* Status */}
-              <div className="flex items-center gap-3 shrink-0">
-                <div className="flex flex-col items-end gap-1">
-                  {hasRatings ? (
-                    <span className="text-xs text-lime-400 font-medium">
-                      {count} notas
+            {/* Card clicável */}
+            <button
+              onClick={() => openFixture(fixture)}
+              className="flex-1 text-left bg-gray-800 hover:bg-gray-700/80 border border-l-0 border-gray-700 hover:border-lime-500/40 rounded-r-xl p-4 transition group min-w-0"
+            >
+              <div className="mb-3 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+                <p className="truncate text-right text-sm font-bold text-white group-hover:text-lime-300 transition">
+                  {fixture.home_team}
+                </p>
+                <div className={`rounded-xl border px-3 py-2 min-w-24 text-center ${
+                  hasScore
+                    ? 'bg-lime-400/10 border-lime-400/30'
+                    : hasPartialScore
+                      ? 'bg-orange-400/10 border-orange-400/30'
+                      : 'bg-gray-900/70 border-gray-600'
+                }`}>
+                  <div className="flex items-center justify-center gap-2 font-mono font-black text-lg">
+                    <span className={hasScore || hasPartialScore ? 'text-white' : 'text-gray-500'}>
+                      {fixture.home_goals ?? '-'}
                     </span>
-                  ) : (
-                    <span className="text-xs text-gray-500">Sem notas</span>
-                  )}
-                  {!hasRatings && (
-                    <span className="text-xs text-gray-600">0/{count || '?'}</span>
-                  )}
+                    <span className="text-xs text-gray-500">x</span>
+                    <span className={hasScore || hasPartialScore ? 'text-white' : 'text-gray-500'}>
+                      {fixture.away_goals ?? '-'}
+                    </span>
+                  </div>
+                  <span className={`mt-1 inline-block text-[10px] font-bold uppercase tracking-wide ${
+                    hasScore ? 'text-lime-300' : hasPartialScore ? 'text-orange-300' : 'text-yellow-300'
+                  }`}>
+                    {hasScore ? 'Placar ok' : hasPartialScore ? 'Parcial' : 'Pendente'}
+                  </span>
                 </div>
-                <span className="text-gray-400 group-hover:text-lime-400 transition text-lg">{'>'}</span>
+                <p className="truncate text-left text-sm font-bold text-white group-hover:text-lime-300 transition">
+                  {fixture.away_team}
+                </p>
               </div>
-            </div>
-          </button>
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <p className="font-semibold text-white text-base group-hover:text-lime-300 transition">
+                      {fixture.label || `${fixture.home_team} x ${fixture.away_team}`}
+                    </p>
+                    {hasScore && (
+                      <span className="text-sm font-bold text-lime-300 px-2 py-0.5 bg-lime-500/10 rounded">
+                        {fixture.home_goals} x {fixture.away_goals}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1 flex items-center gap-2">
+                    <span>{fixture.home_team} x {fixture.away_team}</span>
+                    {kickoffDate && (
+                      <span className="text-gray-600">
+                        • {kickoffDate.toLocaleDateString('pt-BR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <div className="flex flex-col items-end gap-1">
+                    {hasRatings ? (
+                      <span className="text-xs text-lime-400 font-medium">
+                        {count} notas
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-500">Sem notas</span>
+                    )}
+                    {!hasRatings && (
+                      <span className="text-xs text-gray-600">0/{count || '?'}</span>
+                    )}
+                  </div>
+                  <span className="text-gray-400 group-hover:text-lime-400 transition text-lg">{'>'}</span>
+                </div>
+              </div>
+            </button>
+          </div>
         )
       })}
 
@@ -629,8 +1086,9 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
 
               {!loadingPlayers && players.length > 0 && (
                 <>
-                  {/* Card de resumo (por time) */}
-                  {Object.entries(playersByTeam).map(([teamName, teamPlayers]) => {
+                  {/* Card de resumo (por time) — lado a lado */}
+                  <div className="grid grid-cols-2 gap-3">
+                    {Object.entries(playersByTeam).map(([teamName, teamPlayers]) => {
                     const lineup = getTeamLineup(teamPlayers)
                     const teamPlayed = lineup.participating.length
                     const teamNotPlayed = lineup.notPlayed.length
@@ -675,13 +1133,59 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
                       </div>
                     )
                   })}
+                  </div>
 
                   {/* Seção de placar */}
+                  <div className="bg-gray-800/70 border border-gray-700 rounded-xl p-4">
+                    <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Times do jogo</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs text-gray-500 mb-1 block">Mandante</label>
+                        <select
+                          value={fixtureTeams.home_team}
+                          onChange={(e) => setFixtureTeams(prev => ({ ...prev, home_team: e.target.value }))}
+                          className="w-full bg-gray-900 border border-gray-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-lime-400"
+                        >
+                          <option value="">Selecione</option>
+                          {teamOptions.map((team) => (
+                            <option key={team} value={team}>{team}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 mb-1 block">Visitante</label>
+                        <select
+                          value={fixtureTeams.away_team}
+                          onChange={(e) => setFixtureTeams(prev => ({ ...prev, away_team: e.target.value }))}
+                          className="w-full bg-gray-900 border border-gray-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-lime-400"
+                        >
+                          <option value="">Selecione</option>
+                          {teamOptions.map((team) => (
+                            <option key={team} value={team}>{team}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between gap-3">
+                      <p className="text-xs text-gray-500">
+                        Ajuste aqui jogos antigos cadastrados com selecoes incorretas.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={saveFixtureTeamsOnly}
+                        disabled={savingFixture}
+                        className="shrink-0 rounded-lg bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 px-3 py-2 text-xs font-bold text-white transition"
+                      >
+                        Atualizar times
+                      </button>
+                    </div>
+                  </div>
+
                   <div className="bg-gray-800/70 border border-gray-700 rounded-xl p-4">
                     <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Placar do Jogo</h4>
                     <div className="flex items-center gap-3">
                       <div className="flex-1">
-                        <p className="text-xs text-gray-500 mb-1">{selectedFixture.home_team}</p>
+                        <p className="text-xs text-gray-500 mb-1">{fixtureTeams.home_team || selectedFixture.home_team}</p>
                         <input
                           type="number"
                           min={0}
@@ -696,7 +1200,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
                         <span className="text-xs">x</span>
                       </div>
                       <div className="flex-1">
-                        <p className="text-xs text-gray-500 mb-1">{selectedFixture.away_team}</p>
+                        <p className="text-xs text-gray-500 mb-1">{fixtureTeams.away_team || selectedFixture.away_team}</p>
                         <input
                           type="number"
                           min={0}
@@ -753,8 +1257,153 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
               )}
 
               {!loadingPlayers && players.length === 0 && (
-                <div className="text-center text-gray-400 py-8">
-                  Nenhum jogador encontrado para este jogo
+                <div className="space-y-4">
+                  <div className="bg-gray-800/70 border border-gray-700 rounded-xl p-4">
+                    <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Times do jogo</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs text-gray-500 mb-1 block">Mandante</label>
+                        <select
+                          value={fixtureTeams.home_team}
+                          onChange={(e) => setFixtureTeams(prev => ({ ...prev, home_team: e.target.value }))}
+                          className="w-full bg-gray-900 border border-gray-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-lime-400"
+                        >
+                          <option value="">Selecione</option>
+                          {teamOptions.map((team) => (
+                            <option key={team} value={team}>{team}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 mb-1 block">Visitante</label>
+                        <select
+                          value={fixtureTeams.away_team}
+                          onChange={(e) => setFixtureTeams(prev => ({ ...prev, away_team: e.target.value }))}
+                          className="w-full bg-gray-900 border border-gray-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-lime-400"
+                        >
+                          <option value="">Selecione</option>
+                          {teamOptions.map((team) => (
+                            <option key={team} value={team}>{team}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between gap-3">
+                      <p className="text-xs text-gray-500">
+                        Corrija jogos antigos antes de preencher as notas.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={saveFixtureTeamsOnly}
+                        disabled={savingFixture}
+                        className="shrink-0 rounded-lg bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 px-3 py-2 text-xs font-bold text-white transition"
+                      >
+                        Atualizar times
+                      </button>
+                    </div>
+                  </div>
+                  <div className="text-center text-gray-400 py-4">
+                    <p className="text-base font-semibold text-white mb-2">Nenhum jogador encontrado para este jogo</p>
+                    <p className="text-sm text-gray-500">
+                      Você ainda pode preencher as notas manualmente colando as linhas abaixo.
+                    </p>
+                  </div>
+
+                  <div className="bg-gray-800/70 border border-gray-700 rounded-xl p-3">
+                    <textarea
+                      value={manualBulkText}
+                      onChange={(e) => {
+                        const nextText = e.target.value
+                        setManualBulkText(nextText)
+                        setFixtureTeams(prev => applyDetectedFixtureTeams(nextText, prev, teamOptions))
+                        setManualBulkResult(null)
+                      }}
+                      className="w-full min-h-28 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-lime-400 resize-y"
+                      placeholder={'Aceita JSON com players ou linhas soltas.\nEx:\nNome do jogador 7.4 90\nOutro jogador 6.8 72'}
+                    />
+                    <div className="mt-2 flex items-center justify-between gap-3">
+                      <p className="text-xs text-gray-500">
+                        O sistema vai buscar os jogadores no banco pelo nome.
+                      </p>
+                      <button
+                        onClick={saveManualBulkText}
+                        disabled={savingManualBulk}
+                        className="shrink-0 bg-lime-400 hover:bg-lime-300 disabled:bg-gray-600 text-black text-xs font-bold px-3 py-2 rounded-lg transition"
+                      >
+                        {savingManualBulk ? 'Salvando...' : 'Salvar manual'}
+                      </button>
+                    </div>
+                    {manualBulkResult && (
+                      <div className="mt-2 text-xs">
+                        <span className="text-lime-400">{manualBulkResult.matched} linhas preenchidas</span>
+                        {manualBulkResult.unmatched.length > 0 && (
+                          <span className="text-yellow-400">
+                            {' '}· {manualBulkResult.unmatched.length} sem correspondencia
+                          </span>
+                        )}
+                        {manualBulkResult.unmatchedDetails && manualBulkResult.unmatchedDetails.length > 0 && (
+                          <div className="mt-2 space-y-2">
+                            {manualBulkResult.unmatchedDetails.slice(0, 8).map((item) => (
+                              <div key={item.name} className="rounded-lg border border-yellow-400/20 bg-yellow-400/5 px-3 py-2">
+                                <div className="flex items-start justify-between gap-3">
+                                  <p className="font-semibold text-yellow-200">{item.name}</p>
+                                  <button
+                                    type="button"
+                                    onClick={() => ignoreManualUnmatched(item.name)}
+                                    className="shrink-0 rounded border border-gray-500/40 bg-gray-900/60 px-2 py-1 text-[11px] font-semibold text-gray-200 hover:bg-gray-700 transition"
+                                  >
+                                    Ignorar
+                                  </button>
+                                </div>
+                                <p className="mt-1 text-[11px] text-yellow-100/70">
+                                  Escolha uma opção antes de substituir.
+                                </p>
+                                <div className="mt-1 flex flex-wrap gap-2">
+                                  {(item.suggestions.length > 0 ? item.suggestions : []).map((suggestion) => (
+                                    <button
+                                      key={`${suggestion.id}-${suggestion.name}`}
+                                      type="button"
+                                      onClick={() => applyManualSuggestion(item.name, suggestion)}
+                                      className="rounded-full border border-yellow-400/25 bg-black/20 px-2 py-1 text-[11px] text-yellow-100 hover:bg-yellow-400/15 transition text-left"
+                                      title={`${suggestion.position} · ${suggestion.team || 'sem time'} · ${suggestion.name}`}
+                                    >
+                                      {suggestion.position || '--'} · {suggestion.team || 'sem time'} · {suggestion.name}
+                                    </button>
+                                  ))}
+                                </div>
+                                <label className="mt-3 block">
+                                  <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-yellow-100/60">
+                                    Conectar com jogador dos times do jogo
+                                  </span>
+                                  <select
+                                    defaultValue=""
+                                    onChange={(event) => {
+                                      const selected = (item.options ?? []).find(option => String(option.id) === event.target.value)
+                                      if (selected) applyManualSuggestion(item.name, selected)
+                                      event.currentTarget.value = ''
+                                    }}
+                                    className="w-full rounded-lg border border-yellow-400/20 bg-gray-950 px-2 py-2 text-xs text-white focus:outline-none focus:border-lime-400"
+                                  >
+                                    <option value="">
+                                      {item.options?.length ? 'Escolher jogador...' : 'Nenhuma opcao do time encontrada'}
+                                    </option>
+                                    {(item.options ?? []).map(option => (
+                                      <option key={option.id} value={option.id}>
+                                        {option.position || '--'} - {option.team || 'sem time'} - {option.name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </label>
+                                <p className="mt-2 text-[11px] text-yellow-100/60">
+                                  Depois de conectar, clique em Salvar manual novamente.
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -764,13 +1413,16 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
                 const played = lineup.starters
                 const substitutes = lineup.substitutes
 
-                const notPlayed = lineup.notPlayed.sort((a, b) => {
+                const notPlayed = lineup.notPlayed
+                /*
+                const notPlayedOld = lineup.notPlayed.sort((a, b) => {
                   // Ordenar por posição
                   const posOrder = { GK: 0, ZAG: 1, LAT: 2, MEI: 3, ATK: 4 }
                   const posA = (posOrder as any)[a.position] ?? 99
                   const posB = (posOrder as any)[b.position] ?? 99
                   return posA - posB
                 })
+                */
 
                 return (
                   <div key={teamName}>
@@ -803,14 +1455,16 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
                                 {mins >= 90 ? '90min' : `Saiu ${mins}'`}
                               </span>
 
-                              <button
-                                type="button"
-                                onClick={() => setPlayerLineupRole(player.id, 'substitute')}
-                                className="w-16 bg-lime-500/10 hover:bg-orange-500/20 border border-lime-500/30 hover:border-orange-500/30 text-lime-200 hover:text-orange-200 text-[11px] font-semibold rounded px-1 py-1.5 transition shrink-0"
-                                title="Titular. Clique para mover para reservas."
+                              <select
+                                value={lineupOverrides[player.id] ?? 'auto'}
+                                onChange={(e) => setPlayerLineupRole(player.id, e.target.value as 'auto' | 'starter' | 'substitute' | 'not_played')}
+                                className="w-24 bg-gray-700 border border-gray-600 text-white text-[11px] rounded px-1 py-1.5 focus:outline-none focus:border-lime-400 shrink-0"
                               >
-                                Titular
-                              </button>
+                                <option value="auto">Auto</option>
+                                <option value="starter">Titular</option>
+                                <option value="substitute">Reserva</option>
+                                <option value="not_played">Nao rel.</option>
+                              </select>
 
                               <span className={`text-xs font-bold px-1.5 py-0.5 rounded w-10 text-center shrink-0 ${ratingColor(ratingNum)}`}>
                                 {ratingNum !== null && Number.isFinite(ratingNum) ? ratingNum.toFixed(1) : '-'}
@@ -821,10 +1475,8 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
                                 min={0}
                                 max={120}
                                 value={val.minutes}
-                                onChange={(e) => setLocalRatings(prev => ({
-                                  ...prev,
-                                  [player.id]: { ...(prev[player.id] ?? { rating: '' }), minutes: e.target.value },
-                                }))}
+                                onChange={(e) => updateLocalPlayerValue(player.id, 'minutes', e.target.value)}
+                                onBlur={() => commitPlayerValue(player.id)}
                                 className="w-12 bg-gray-700 border border-gray-600 text-white text-center text-xs rounded px-1 py-1.5 focus:outline-none focus:border-lime-400 shrink-0"
                                 placeholder="90"
                               />
@@ -835,10 +1487,8 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
                                 max={10}
                                 step={0.1}
                                 value={val.rating}
-                                onChange={(e) => setLocalRatings(prev => ({
-                                  ...prev,
-                                  [player.id]: { ...(prev[player.id] ?? { minutes: '0' }), rating: e.target.value },
-                                }))}
+                                onChange={(e) => updateLocalPlayerValue(player.id, 'rating', e.target.value)}
+                                onBlur={() => commitPlayerValue(player.id)}
                                 className="w-14 bg-gray-700 border border-gray-600 text-white text-center text-xs rounded px-1 py-1.5 focus:outline-none focus:border-lime-400 shrink-0"
                                 placeholder="7.5"
                               />
@@ -870,14 +1520,16 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
                                 <span className="text-xs text-orange-300 w-24 text-center shrink-0">
                                   {entryMinute}' / {mins}min
                                 </span>
-                                <button
-                                  type="button"
-                                  onClick={() => setPlayerLineupRole(player.id, 'starter')}
-                                  className="w-16 bg-orange-500/10 hover:bg-lime-500/20 border border-orange-500/30 hover:border-lime-500/30 text-orange-200 hover:text-lime-200 text-[11px] font-semibold rounded px-1 py-1.5 transition shrink-0"
-                                  title="Reserva. Clique para mover para titulares."
+                                <select
+                                  value={lineupOverrides[player.id] ?? 'auto'}
+                                  onChange={(e) => setPlayerLineupRole(player.id, e.target.value as 'auto' | 'starter' | 'substitute' | 'not_played')}
+                                  className="w-24 bg-gray-700 border border-gray-600 text-white text-[11px] rounded px-1 py-1.5 focus:outline-none focus:border-lime-400 shrink-0"
                                 >
-                                  Reserva
-                                </button>
+                                  <option value="auto">Auto</option>
+                                  <option value="starter">Titular</option>
+                                  <option value="substitute">Reserva</option>
+                                  <option value="not_played">Nao rel.</option>
+                                </select>
                                 <span className={`text-xs font-bold px-1.5 py-0.5 rounded w-10 text-center shrink-0 ${ratingColor(ratingNum)}`}>
                                   {ratingNum !== null && Number.isFinite(ratingNum) ? ratingNum.toFixed(1) : '-'}
                                 </span>
@@ -886,10 +1538,8 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
                                   min={0}
                                   max={120}
                                   value={val.minutes}
-                                  onChange={(e) => setLocalRatings(prev => ({
-                                    ...prev,
-                                    [player.id]: { ...(prev[player.id] ?? { rating: '' }), minutes: e.target.value },
-                                  }))}
+                                  onChange={(e) => updateLocalPlayerValue(player.id, 'minutes', e.target.value)}
+                                  onBlur={() => commitPlayerValue(player.id)}
                                   className="w-12 bg-gray-700 border border-gray-600 text-white text-center text-xs rounded px-1 py-1.5 focus:outline-none focus:border-lime-400 shrink-0"
                                   placeholder="14"
                                 />
@@ -899,10 +1549,8 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
                                   max={10}
                                   step={0.1}
                                   value={val.rating}
-                                  onChange={(e) => setLocalRatings(prev => ({
-                                    ...prev,
-                                    [player.id]: { ...(prev[player.id] ?? { minutes: '0' }), rating: e.target.value },
-                                  }))}
+                                  onChange={(e) => updateLocalPlayerValue(player.id, 'rating', e.target.value)}
+                                  onBlur={() => commitPlayerValue(player.id)}
                                   className="w-14 bg-gray-700 border border-gray-600 text-white text-center text-xs rounded px-1 py-1.5 focus:outline-none focus:border-lime-400 shrink-0"
                                   placeholder="7.5"
                                 />
@@ -927,6 +1575,17 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
 
                               <span className="flex-1 text-sm text-gray-400 truncate">{player.name}</span>
 
+                              <select
+                                value={lineupOverrides[player.id] ?? 'auto'}
+                                onChange={(e) => setPlayerLineupRole(player.id, e.target.value as 'auto' | 'starter' | 'substitute' | 'not_played')}
+                                className="w-24 bg-gray-700 border border-gray-600 text-white text-[11px] rounded px-1 py-1.5 focus:outline-none focus:border-lime-400 shrink-0"
+                              >
+                                <option value="auto">Auto</option>
+                                <option value="starter">Titular</option>
+                                <option value="substitute">Reserva</option>
+                                <option value="not_played">Nao rel.</option>
+                              </select>
+
                               <span className="text-xs text-gray-700 w-12 text-center shrink-0">—</span>
 
                               <span className={`text-xs font-bold px-1.5 py-0.5 rounded w-10 text-center shrink-0 ${ratingColor(ratingNum)}`}>
@@ -938,10 +1597,8 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
                                 min={0}
                                 max={120}
                                 value={val.minutes}
-                                onChange={(e) => setLocalRatings(prev => ({
-                                  ...prev,
-                                  [player.id]: { ...(prev[player.id] ?? { rating: '' }), minutes: e.target.value },
-                                }))}
+                                onChange={(e) => updateLocalPlayerValue(player.id, 'minutes', e.target.value)}
+                                onBlur={() => commitPlayerValue(player.id)}
                                 className="w-12 bg-gray-700 border border-gray-600 text-white text-center text-xs rounded px-1 py-1.5 focus:outline-none focus:border-lime-400 shrink-0"
                                 placeholder="0"
                               />
@@ -952,10 +1609,8 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
                                 max={10}
                                 step={0.1}
                                 value={val.rating}
-                                onChange={(e) => setLocalRatings(prev => ({
-                                  ...prev,
-                                  [player.id]: { ...(prev[player.id] ?? { minutes: '0' }), rating: e.target.value },
-                                }))}
+                                onChange={(e) => updateLocalPlayerValue(player.id, 'rating', e.target.value)}
+                                onBlur={() => commitPlayerValue(player.id)}
                                 className="w-14 bg-gray-700 border border-gray-600 text-white text-center text-xs rounded px-1 py-1.5 focus:outline-none focus:border-lime-400 shrink-0"
                                 placeholder="7.5"
                               />
