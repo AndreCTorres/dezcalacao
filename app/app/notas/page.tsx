@@ -159,7 +159,7 @@ export default async function NotasDaRodadaPage({
 
   for (const fx of fixtureList) {
     const players = ratedByFixture.get(fx.id) || []
-    if (players.length === 0) continue // só mostra jogo que tem notas
+    // Sempre mostrar o jogo, mesmo sem notas (pode ser adicionadas depois)
     const hasScore = fx.home_goals != null && fx.away_goals != null
     games.push({
       id: fx.id,
@@ -171,6 +171,8 @@ export default async function NotasDaRodadaPage({
       awayGoals: fx.away_goals as number | null,
       teams: buildTeams(players, fx.home_team as string, fx.away_team as string),
       total: players.length,
+      hasRatings: players.length > 0,
+      fixtureId: fx.id,
     })
   }
 

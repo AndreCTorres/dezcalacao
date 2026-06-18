@@ -25,6 +25,8 @@ export type GameBlock = {
   awayGoals: number | null
   teams: Array<{ team_name: string; players: RatedPlayer[] }>
   total: number
+  hasRatings?: boolean // novo: indica se o jogo tem notas
+  fixtureId?: number // novo: ID do fixture para API
 }
 
 function ratingBadge(r: number): string {
@@ -112,20 +114,31 @@ export function RoundGames({ games }: { games: GameBlock[] }) {
                   </div>
                 )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-white/10">
-                  {g.teams.map((t) => (
-                    <div key={t.team_name}>
-                      <div className="px-4 py-1.5 bg-white/[0.02] text-[11px] font-bold uppercase tracking-wider text-lime-300/80">
-                        {t.team_name}
+                {g.total === 0 ? (
+                  // Estado vazio: sem notas preenchidas
+                  <div className="px-4 py-6 text-center border-t border-white/10 bg-white/[0.02]">
+                    <p className="text-gray-400 text-sm mb-3">Nenhum jogador encontrado para este jogo</p>
+                    <p className="text-gray-500 text-xs mb-3">
+                      Aguarde o admin preencher as notas ou contate-o.
+                    </p>
+                  </div>
+                ) : (
+                  // Estado com notas: listar jogadores
+                  <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-white/10">
+                    {g.teams.map((t) => (
+                      <div key={t.team_name}>
+                        <div className="px-4 py-1.5 bg-white/[0.02] text-[11px] font-bold uppercase tracking-wider text-lime-300/80">
+                          {t.team_name}
+                        </div>
+                        <ul className="divide-y divide-white/5">
+                          {t.players.map((p) => (
+                            <PlayerRow key={p.player_id} p={p} />
+                          ))}
+                        </ul>
                       </div>
-                      <ul className="divide-y divide-white/5">
-                        {t.players.map((p) => (
-                          <PlayerRow key={p.player_id} p={p} />
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
