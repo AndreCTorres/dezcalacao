@@ -54,7 +54,7 @@ export function MemberRoundChecker({ data, onClose }: MemberRoundCheckerProps) {
   const stats = useMemo(() => {
     const allPlayers = [...data.starters, ...data.bench]
     const withRating = allPlayers.filter(p => p.rating != null)
-    const scoringStarters = data.starters.filter(p => p.rating != null && (p.minutes ?? 0) >= 20)
+    const scoringStarters = data.starters.filter(p => p.rating != null)
     const effectiveCount = data.starters.length + (data.substitutions?.length || 0)
 
     return {

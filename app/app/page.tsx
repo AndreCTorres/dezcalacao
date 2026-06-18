@@ -110,7 +110,7 @@ export default async function AppPage() {
   // Buscar grupo separadamente (evita problema de join/schema cache)
   const { data: group, error: groupError } = await admin
     .from('groups')
-    .select('id, name, status, season, admin_id, max_subs_por_rodada')
+    .select('id, name, status, season, admin_id, max_subs_por_rodada, min_minutos')
     .eq('id', membershipRow.group_id)
     .single()
 
@@ -245,35 +245,39 @@ export default async function AppPage() {
 
   // Buscar ratings de todos os jogadores
   // Usando rodada com dados + fallback para scored ou aberta
-  let ratingsMap: Record<number, number | null> = {}
-  let ratingsByPlayerKey: Record<string, number | null> = {}
+  let ratingsMap: Record<number, { rating: number | null; minutes: number | null }> = {}
+  let ratingsByPlayerKey: Record<string, { rating: number | null; minutes: number | null }> = {}
   
   if (ratingsSourceRound && teamPlayersWithSubs && teamPlayersWithSubs.length > 0) {
     const { data: ratings } = await admin
       .from('player_round_ratings')
-      .select('player_id, rating, players ( name, team_name )')
+      .select('player_id, rating, minutes, players ( name, team_name )')
       .eq('round_id', ratingsSourceRound.id)
 
     if (ratings) {
       for (const r of ratings as any[]) {
         if (r.rating != null) {
-          ratingsMap[r.player_id] = r.rating
+          ratingsMap[r.player_id] = { rating: r.rating, minutes: r.minutes }
         }
         const ratingPlayer = Array.isArray(r.players) ? r.players[0] : r.players
         const playerKey = normalizeRatingKey(ratingPlayer?.name, ratingPlayer?.team_name)
-        if (playerKey && r.rating != null) ratingsByPlayerKey[playerKey] = r.rating
+        if (playerKey && r.rating != null) ratingsByPlayerKey[playerKey] = { rating: r.rating, minutes: r.minutes }
       }
     }
   }
 
   // Montar team com ratings
-  const teamWithRatings: PitchPlayer[] = (teamPlayersWithSubs || []).map((tp: any) => ({
-    ...tp,
-    rating:
+  const teamWithRatings: PitchPlayer[] = (teamPlayersWithSubs || []).map((tp: any) => {
+    const ratingData =
       ratingsMap[tp.player_id] ??
       ratingsByPlayerKey[normalizeRatingKey(tp.players?.name, tp.players?.team_name)] ??
-      null,
-  }))
+      null
+    return {
+      ...tp,
+      rating: ratingData?.rating ?? null,
+      minutes: ratingData?.minutes ?? null,
+    }
+  })
 
   // Buscar membros do grupo para ranking
   const { data: members } = await admin

@@ -57,14 +57,6 @@ function key(roundId: string, playerId: number) {
 }
 
 export async function getLiveRoundScores(admin: SupabaseAdmin, groupId: string): Promise<LiveRoundScore[]> {
-  const { data: group } = await admin
-    .from('groups')
-    .select('min_minutos')
-    .eq('id', groupId)
-    .single()
-
-  const minMinutes = Number((group as any)?.min_minutos ?? 20)
-
   const { data: rounds } = await admin
     .from('rounds')
     .select('id, name, status')
@@ -171,10 +163,8 @@ export async function getLiveRoundScores(admin: SupabaseAdmin, groupId: string):
           const playerId = postSwapsForMember.get(preSubPlayerId) ?? preSubPlayerId
           const rating = ratingsByRoundPlayer.get(key(round.id, playerId))
           const playerRating = Number(rating?.rating)
-          const minutes = Number(rating?.minutes ?? 0)
-
           if (Number.isFinite(playerRating)) hasSourceRating = true
-          if (Number.isFinite(playerRating) && minutes >= minMinutes) {
+          if (Number.isFinite(playerRating)) {
             points += playerRating
           }
         })

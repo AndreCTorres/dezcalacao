@@ -43,7 +43,7 @@ function ratingColor(r: number | null): string {
 
 function sumRatings(players: PlayerRating[]): number {
   return players
-    .filter(p => p.slot === 'starter' && p.rating !== null && p.minutes >= 20)
+    .filter(p => p.slot === 'starter' && p.rating !== null)
     .reduce((sum, p) => sum + (p.rating ?? 0), 0)
 }
 
@@ -142,7 +142,7 @@ export function PlayerRatingsView({ groupId, memberId }: PlayerRatingsViewProps)
                     </p>
                     <div className="space-y-1.5">
                       {starters.map((p) => {
-                        const pontua = p.rating !== null && p.minutes >= 20
+                        const pontua = p.rating !== null
                         return (
                           <div key={p.playerId} className="flex items-center gap-2">
                             <span className="text-xs text-gray-500 w-7 shrink-0 text-right">

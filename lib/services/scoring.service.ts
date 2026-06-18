@@ -44,14 +44,20 @@ export async function calculateMemberRoundScore(
     .eq('group_member_id', groupMemberId)
     .eq('round_id', roundId)
 
+  const { data: postRoundSwaps } = await admin
+    .from('post_round_swaps')
+    .select('out_player_id, in_player_id')
+    .eq('group_member_id', groupMemberId)
+    .eq('round_id', roundId)
+
   // Construir lineup efetivo (considerar substituições)
   const effectiveLineup = applySubstitutions(
-    teamPlayers as TeamPlayer[],
-    substitutions as Substitution[]
+    applySubstitutions(teamPlayers as TeamPlayer[], substitutions as Substitution[]),
+    (postRoundSwaps ?? []) as Substitution[]
   )
 
   // Buscar ratings de todos os jogadores da rodada
-  const playerIds = teamPlayers.map((tp) => tp.player_id)
+  const playerIds = Array.from(new Set(effectiveLineup.map((tp) => tp.player_id)))
   const { data: allRatings } = await admin
     .from('player_round_ratings')
     .select('id, player_id, round_id, fixture_id, rating, minutes, source, fetched_at')

@@ -13,6 +13,7 @@ export type PitchPlayer = {
   slot: 'starter' | 'bench'
   position_slot: string
   rating?: number | null
+  minutes?: number | null
   players: {
     id: number
     name: string
@@ -27,6 +28,7 @@ type PitchViewProps = {
   team: PitchPlayer[]
   memberTeamName?: string | null
   lateralSideMode?: 'normal' | 'inverted'
+  showSubsButton?: boolean
 }
 
 // Cores por posição
@@ -159,7 +161,7 @@ const ROW_TOP: Record<string, string> = {
   GK:  '88%',
 }
 
-export function PitchView({ team, memberTeamName, lateralSideMode = 'normal' }: PitchViewProps) {
+export function PitchView({ team, memberTeamName, lateralSideMode = 'normal', showSubsButton = true }: PitchViewProps) {
   const starters = team.filter(t => t.slot === 'starter')
   const bench = team.filter(t => t.slot === 'bench')
 
@@ -293,7 +295,7 @@ export function PitchView({ team, memberTeamName, lateralSideMode = 'normal' }: 
                   <span className="text-yellow-400/60 text-xs">pts</span>
                 </div>
               )}
-              {team.length > 0 && (
+              {showSubsButton && team.length > 0 && (
                 <Link
                   href="#trocas-pos-rodada"
                   onClick={scrollToPostRoundSwaps}

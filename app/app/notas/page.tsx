@@ -97,6 +97,7 @@ export default async function NotasDaRodadaPage({
     .from('fixtures')
     .select('id, home_team, away_team, label, home_goals, away_goals')
     .eq('round_id', selectedRoundId)
+    .order('sort_order', { ascending: true, nullsFirst: false })
     .order('id', { ascending: true })
   const fixtureList = fixtures ?? []
 
@@ -112,9 +113,9 @@ export default async function NotasDaRodadaPage({
     const playerIds = Array.from(new Set(ratingRows.map((r) => r.player_id)))
     const { data: players } = await admin
       .from('players')
-      .select('api_player_id, name, team_name, position')
-      .in('api_player_id', playerIds)
-    const pMap = new Map((players ?? []).map((p) => [p.api_player_id, p]))
+      .select('id, name, team_name, position')
+      .in('id', playerIds)
+    const pMap = new Map((players ?? []).map((p) => [p.id, p]))
 
     for (const r of ratingRows) {
       const p = pMap.get(r.player_id)
@@ -158,7 +159,29 @@ export default async function NotasDaRodadaPage({
     return teams
   }
 
+  const dedupedFixtures = new Map<string, (typeof fixtureList)[number]>()
   for (const fx of fixtureList) {
+    const key = `${normalize((fx.home_team as string) ?? '')}|${normalize((fx.away_team as string) ?? '')}`
+    const current = dedupedFixtures.get(key)
+    if (!current) {
+      dedupedFixtures.set(key, fx)
+      continue
+    }
+
+    const currentNotes = ratedByFixture.get(current.id)?.length ?? 0
+    const nextNotes = ratedByFixture.get(fx.id)?.length ?? 0
+    const currentHasScore = current.home_goals != null && current.away_goals != null
+    const nextHasScore = fx.home_goals != null && fx.away_goals != null
+
+    if (
+      nextNotes > currentNotes ||
+      (nextNotes === currentNotes && Number(nextHasScore) > Number(currentHasScore))
+    ) {
+      dedupedFixtures.set(key, fx)
+    }
+  }
+
+  for (const fx of dedupedFixtures.values()) {
     const players = ratedByFixture.get(fx.id) || []
     // Sempre mostrar o jogo, mesmo sem notas (pode ser adicionadas depois)
     const hasScore = fx.home_goals != null && fx.away_goals != null

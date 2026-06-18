@@ -328,7 +328,6 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
 
     const invalid = parsed.find(r =>
       (r.rating !== null && (!Number.isFinite(r.rating) || r.rating < 0 || r.rating > 10)) ||
-      (r.rating !== null && r.minutes <= 0) ||
       r.minutes < 0 ||
       r.minutes > 120
     )
@@ -362,8 +361,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
     if (lineupOverrides[player.id] === 'not_played') return false
     const val = committedRatings[player.id]
     if (!val?.rating.trim()) return false
-    const minutes = Number.parseInt(val.minutes || '0', 10)
-    return Number.isFinite(minutes) && minutes > 0
+    return true
   }
 
   function getPlayerMinutes(player: PlayerRating) {

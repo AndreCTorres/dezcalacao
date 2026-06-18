@@ -53,14 +53,6 @@ export default async function SelecaoDaRodadaPage({
   }
 
   // 2. Buscar config do grupo (minutos mínimos) e rodadas
-  const { data: group } = await admin
-    .from('groups')
-    .select('min_minutos')
-    .eq('id', groupId)
-    .single()
-
-  const minMinutes = group?.min_minutos ?? 20
-
   const { data: rounds } = await admin
     .from('rounds')
     .select('id, name, status, created_at')
@@ -109,10 +101,10 @@ export default async function SelecaoDaRodadaPage({
     const playerIds = Array.from(new Set(ratingRows.map((r) => r.player_id)))
     const { data: players } = await admin
       .from('players')
-      .select('api_player_id, name, team_name, position, photo_url, number')
-      .in('api_player_id', playerIds)
+      .select('id, name, team_name, position, photo_url, number')
+      .in('id', playerIds)
 
-    const playerMap = new Map((players ?? []).map((p) => [p.api_player_id, p]))
+    const playerMap = new Map((players ?? []).map((p) => [p.id, p]))
 
     combined = ratingRows
       .map((r) => {
@@ -133,7 +125,7 @@ export default async function SelecaoDaRodadaPage({
   }
 
   // 4. Calcular o XI e o craque (função pura)
-  const totr = pickTeamOfRound(combined, minMinutes)
+  const totr = pickTeamOfRound(combined)
   const hasTeam = totr.starters.length > 0
 
   return (
@@ -207,8 +199,7 @@ export default async function SelecaoDaRodadaPage({
             {/* Aviso de XI incompleto (faltam notas para alguma posição) */}
             {totr.starters.length < 11 && (
               <p className="text-center text-gray-500 text-xs mt-3">
-                XI parcial: faltam notas para preencher todas as posições (mínimo de{' '}
-                {minMinutes} min para entrar na seleção).
+                XI parcial: faltam notas para preencher todas as posições.
               </p>
             )}
           </>

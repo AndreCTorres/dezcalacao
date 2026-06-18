@@ -310,11 +310,12 @@ export async function confirmPostRoundSwaps(
       .single()
 
     if (group) {
-      await calculateMemberRoundScoreWithPostSwaps(groupMemberId, roundId, group, swaps)
+      await calculateMemberRoundScore(groupMemberId, roundId, group)
     }
 
     console.log('[PostRound] ✓ Trocas confirmadas para membro:', groupMemberId)
     revalidatePath('/app')
+    revalidatePath('/app/times')
 
     return { success: true }
   } catch (error: any) {
@@ -367,102 +368,6 @@ export async function resetPostRoundSwaps(groupMemberId: string, roundId: string
   }
 
   revalidatePath('/app')
+  revalidatePath('/app/times')
   return { success: true }
-}
-
-/**
- * Recalcula o score de um membro aplicando as trocas pós-rodada ao lineup.
- * As trocas pós-rodada são aplicadas DEPOIS das substituições pré-rodada.
- */
-async function calculateMemberRoundScoreWithPostSwaps(
-  groupMemberId: string,
-  roundId: string,
-  group: { max_subs_por_rodada: number; min_minutos: number },
-  swaps: PostRoundSwap[]
-) {
-  const admin = supabaseAdmin()
-
-  // Buscar team_players base
-  const { data: teamPlayers } = await admin
-    .from('team_players')
-    .select('id, player_id, slot, position_slot')
-    .eq('group_member_id', groupMemberId)
-
-  if (!teamPlayers || teamPlayers.length === 0) return null
-
-  // Aplicar substituições pré-rodada
-  const { data: preSubs } = await admin
-    .from('substitutions')
-    .select('out_player_id, in_player_id')
-    .eq('group_member_id', groupMemberId)
-    .eq('round_id', roundId)
-
-  let lineup = [...teamPlayers] as any[]
-
-  // Aplica subs pré-rodada
-  const preSubMap = new Map((preSubs || []).map((s: any) => [s.out_player_id, s.in_player_id]))
-  lineup = lineup.map(tp => {
-    const replacement = preSubMap.get(tp.player_id)
-    if (replacement && tp.slot === 'starter') {
-      return { ...tp, player_id: replacement }
-    }
-    return tp
-  })
-
-  // Aplica trocas pós-rodada
-  const postSwapMap = new Map(swaps.map(s => [s.outPlayerId, s.inPlayerId]))
-  lineup = lineup.map(tp => {
-    const replacement = postSwapMap.get(tp.player_id)
-    if (replacement && tp.slot === 'starter') {
-      return { ...tp, player_id: replacement }
-    }
-    return tp
-  })
-
-  // Buscar ratings
-  const allPlayerIds = lineup.map((tp: any) => tp.player_id)
-  const { data: ratings } = await admin
-    .from('player_round_ratings')
-    .select('player_id, rating, minutes')
-    .eq('round_id', roundId)
-    .in('player_id', allPlayerIds)
-
-  const ratingsMap = new Map<number, any>()
-  ;(ratings || []).forEach((r: any) => {
-    ratingsMap.set(r.player_id, {
-      playerId: r.player_id,
-      teamId: 0,
-      position: lineup.find((tp: any) => tp.player_id === r.player_id)?.position_slot || 'ATK',
-      rating: r.rating,
-      minutes: r.minutes,
-    })
-  })
-
-  // Calcular pontuação
-  const starters = lineup.filter((tp: any) => tp.slot === 'starter')
-  let basePts = 0
-  for (const s of starters) {
-    const r = ratingsMap.get(s.player_id)
-    if (!r) continue
-    if (r.rating == null) {
-      basePts += 6.0 // neutralRating
-    } else if (r.minutes >= group.min_minutos) {
-      basePts += r.rating
-    }
-  }
-  basePts = Math.round(basePts * 100) / 100
-
-  // Upsert no round_scores
-  await admin
-    .from('round_scores')
-    .upsert({
-      group_member_id: groupMemberId,
-      round_id: roundId,
-      base_points: basePts,
-      bonus_points: 0,
-      total_points: basePts,
-      computed_at: new Date().toISOString(),
-    })
-
-  return basePts
 }
