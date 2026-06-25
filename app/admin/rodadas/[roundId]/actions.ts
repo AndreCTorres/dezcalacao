@@ -9,7 +9,7 @@ import { calculateRoundScores } from '@/lib/services/scoring.service'
 
 /**
  * Criar um fixture manual vinculado a uma rodada
- * (sem depender da API-Football Ã¢â‚¬â€ admin registra os jogos manualmente)
+ * (sem depender da API-Football ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â admin registra os jogos manualmente)
  */
 export async function createManualFixture(
   roundId: string,
@@ -19,7 +19,7 @@ export async function createManualFixture(
 ) {
   const supabase = await createActionClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) return { success: false, error: 'NÃƒÂ£o autenticado' }
+  if (authError || !user) return { success: false, error: 'NÃƒÆ’Ã‚Â£o autenticado' }
 
   const admin = supabaseAdmin()
   const cleanHome = homeTeam.trim()
@@ -30,7 +30,7 @@ export async function createManualFixture(
     return { success: false, error: 'Informe as duas selecoes' }
   }
 
-  // Validar que a rodada pertence a um grupo do qual o user ÃƒÂ© admin
+  // Validar que a rodada pertence a um grupo do qual o user ÃƒÆ’Ã‚Â© admin
   const { data: round } = await admin
     .from('rounds')
     .select('id, group_id, groups!inner(admin_id)')
@@ -38,7 +38,7 @@ export async function createManualFixture(
     .single()
 
   if (!round || (round.groups as any).admin_id !== user.id) {
-    return { success: false, error: 'Sem permissÃƒÂ£o' }
+    return { success: false, error: 'Sem permissÃƒÆ’Ã‚Â£o' }
   }
 
   const { data: existingFixtures } = await admin
@@ -55,7 +55,7 @@ export async function createManualFixture(
     return { success: true, fixture: existingFixture, alreadyExists: true }
   }
 
-  // Gerar um ID ÃƒÂºnico para o fixture manual (usa timestamp + random para evitar colisÃƒÂ£o)
+  // Gerar um ID ÃƒÆ’Ã‚Âºnico para o fixture manual (usa timestamp + random para evitar colisÃƒÆ’Ã‚Â£o)
   const manualId = Date.now() * 1000 + Math.floor(Math.random() * 1000)
 
   const { data: fixture, error } = await admin
@@ -109,7 +109,7 @@ export async function upsertPlayerRating(
 ) {
   const supabase = await createActionClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) return { success: false, error: 'NÃƒÂ£o autenticado' }
+  if (authError || !user) return { success: false, error: 'NÃƒÆ’Ã‚Â£o autenticado' }
 
   const admin = supabaseAdmin()
 
@@ -121,7 +121,7 @@ export async function upsertPlayerRating(
     .single()
 
   if (!round || (round.groups as any).admin_id !== user.id) {
-    return { success: false, error: 'Sem permissÃƒÂ£o' }
+    return { success: false, error: 'Sem permissÃƒÆ’Ã‚Â£o' }
   }
 
   // Validar rating (0-10, duas casas decimais)
@@ -155,7 +155,7 @@ export async function upsertPlayerRating(
 }
 
 /**
- * Upsert em batch Ã¢â‚¬â€ recebe um array de ratings do mesmo jogo
+ * Upsert em batch ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â recebe um array de ratings do mesmo jogo
  * Mais eficiente que chamar upsertPlayerRating N vezes
  */
 export async function upsertBatchRatings(
@@ -165,11 +165,11 @@ export async function upsertBatchRatings(
 ) {
   const supabase = await createActionClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) return { success: false, error: 'NÃƒÂ£o autenticado' }
+  if (authError || !user) return { success: false, error: 'NÃƒÆ’Ã‚Â£o autenticado' }
 
   const admin = supabaseAdmin()
 
-  // Validar permissÃƒÂ£o
+  // Validar permissÃƒÆ’Ã‚Â£o
   const { data: round } = await admin
     .from('rounds')
     .select('id, group_id, groups!inner(admin_id)')
@@ -177,7 +177,7 @@ export async function upsertBatchRatings(
     .single()
 
   if (!round || (round.groups as any).admin_id !== user.id) {
-    return { success: false, error: 'Sem permissÃƒÂ£o' }
+    return { success: false, error: 'Sem permissÃƒÆ’Ã‚Â£o' }
   }
 
   for (const r of ratings) {
@@ -189,9 +189,9 @@ export async function upsertBatchRatings(
     }
   }
 
-  // Validar que fixture_id ÃƒÂ© vÃƒÂ¡lido
+  // Validar que fixture_id ÃƒÆ’Ã‚Â© vÃƒÆ’Ã‚Â¡lido
   if (!fixtureId || fixtureId <= 0) {
-    return { success: false, error: 'Fixture invÃƒÂ¡lido' }
+    return { success: false, error: 'Fixture invÃƒÆ’Ã‚Â¡lido' }
   }
 
   const rows = ratings
@@ -222,7 +222,7 @@ export async function upsertBatchRatings(
     return { success: false, error: error.message }
   }
 
-  console.log(`[ManualRatings] Ã¢Å“â€¦ ${rows.length} ratings salvos com sucesso para fixture ${fixtureId}, rodada ${roundId}`)
+  console.log(`[ManualRatings] ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ ${rows.length} ratings salvos com sucesso para fixture ${fixtureId}, rodada ${roundId}`)
 
   revalidatePath(`/admin/rodadas/${roundId}`)
   revalidatePath('/app')
@@ -275,7 +275,7 @@ export async function upsertManualRatingsByName(
       .trim()
 
   const TEAM_ALIASES: Record<string, string[]> = {
-    // SuÃƒÂ­ÃƒÂ§a
+    // SuÃƒÆ’Ã‚Â­ÃƒÆ’Ã‚Â§a
     suica: ['switzerland', 'swiss', 'sui'],
     switzerland: ['suica', 'swiss', 'sui'],
     // Qatar / Catar
@@ -285,7 +285,7 @@ export async function upsertManualRatingsByName(
     'coreia do sul': ['south korea', 'korea republic'],
     'south korea': ['coreia do sul', 'korea republic'],
     'korea republic': ['south korea', 'coreia do sul'],
-    // RepÃƒÂºblica Tcheca
+    // RepÃƒÆ’Ã‚Âºblica Tcheca
     'rep tcheca': ['czech republic', 'czechia'],
     'republica tcheca': ['czech republic', 'czechia'],
     'czech republic': ['rep tcheca', 'republica tcheca', 'czechia'],
@@ -301,19 +301,19 @@ export async function upsertManualRatingsByName(
     // Brasil
     brasil: ['brazil'],
     brazil: ['brasil'],
-    // JapÃƒÂ£o
+    // JapÃƒÆ’Ã‚Â£o
     japao: ['japan'],
     japan: ['japao'],
     // Marrocos
     marrocos: ['morocco'],
     morocco: ['marrocos'],
-    // CuraÃƒÂ§ao
+    // CuraÃƒÆ’Ã‚Â§ao
     curacao: ['curacao'],
     // Turquia
     turquia: ['turkiye', 'turkey'],
     turkey: ['turkiye', 'turquia'],
     turkiye: ['turkey', 'turquia'],
-    // BÃƒÂ³snia
+    // BÃƒÆ’Ã‚Â³snia
     bosnia: ['bosnia & herzegovina', 'bosnia and herzegovina'],
     'bosnia & herzegovina': ['bosnia', 'bosnia and herzegovina'],
     'bosnia and herzegovina': ['bosnia', 'bosnia & herzegovina'],
@@ -332,9 +332,9 @@ export async function upsertManualRatingsByName(
     // Paraguai
     paraguai: ['paraguay'],
     paraguay: ['paraguai'],
-    // MÃƒÂ©xico
+    // MÃƒÆ’Ã‚Â©xico
     mexico: ['mexico'],
-    // ÃƒÂfrica do Sul
+    // ÃƒÆ’Ã‚Âfrica do Sul
     'africa do sul': ['south africa'],
     'south africa': ['africa do sul'],
     // Cabo Verde
@@ -347,52 +347,52 @@ export async function upsertManualRatingsByName(
     'democratic republic of the congo': ['dr congo', 'congo dr', 'rd congo', 'republica democratica do congo'],
     'rd congo': ['dr congo', 'congo dr', 'democratic republic of the congo'],
     'republica democratica do congo': ['dr congo', 'congo dr', 'democratic republic of the congo'],
-    // EscÃƒÂ³cia
+    // EscÃƒÆ’Ã‚Â³cia
     escocia: ['scotland'],
     scotland: ['escocia'],
-    // ArgÃƒÂ©lia
+    // ArgÃƒÆ’Ã‚Â©lia
     argelia: ['algeria'],
     algeria: ['argelia'],
-    // IrÃƒÂ£
+    // IrÃƒÆ’Ã‚Â£
     ira: ['iran'],
     iran: ['ira'],
-    // Nova ZelÃƒÂ¢ndia
+    // Nova ZelÃƒÆ’Ã‚Â¢ndia
     'nova zelandia': ['new zealand'],
     'new zealand': ['nova zelandia'],
-    // UzbequistÃƒÂ£o
+    // UzbequistÃƒÆ’Ã‚Â£o
     uzbequistao: ['uzbekistan'],
     uzbekistan: ['uzbequistao'],
-    // TunÃƒÂ­sia
+    // TunÃƒÆ’Ã‚Â­sia
     tunisia: ['tunis', 'tunisia'],
     tunis: ['tunisia', 'tunisia'],
     // Egito
     egito: ['egypt'],
     egypt: ['egito'],
-    // ArÃƒÂ¡bia Saudita
+    // ArÃƒÆ’Ã‚Â¡bia Saudita
     'arabia saudita': ['saudi arabia'],
     'saudi arabia': ['arabia saudita'],
     // Iraque
     iraque: ['iraq'],
     iraq: ['iraque'],
-    // JordÃƒÂ¢nia
+    // JordÃƒÆ’Ã‚Â¢nia
     jordania: ['jordan'],
     jordan: ['jordania'],
     // Noruega
     noruega: ['norway'],
     norway: ['noruega'],
-    // CroÃƒÂ¡cia
+    // CroÃƒÆ’Ã‚Â¡cia
     croacia: ['croatia'],
     croatia: ['croacia'],
     // Espanha
     espanha: ['spain'],
     spain: ['espanha'],
-    // FranÃƒÂ§a
+    // FranÃƒÆ’Ã‚Â§a
     franca: ['france'],
     france: ['franca'],
-    // BÃƒÂ©lgica
+    // BÃƒÆ’Ã‚Â©lgica
     belgica: ['belgium'],
     belgium: ['belgica'],
-    // SuÃƒÂ©cia
+    // SuÃƒÆ’Ã‚Â©cia
     suecia: ['sweden'],
     sweden: ['suecia'],
     // Inglaterra
@@ -404,7 +404,7 @@ export async function upsertManualRatingsByName(
     // Uruguai
     uruguai: ['uruguay'],
     uruguay: ['uruguai'],
-    // ColÃƒÂ´mbia
+    // ColÃƒÆ’Ã‚Â´mbia
     colombia: ['colombia'],
     argentina: ['argentina'],
     australia: ['australia'],
@@ -768,11 +768,11 @@ export async function updateFixtureScore(
 ) {
   const supabase = await createActionClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) return { success: false, error: 'NÃƒÂ£o autenticado' }
+  if (authError || !user) return { success: false, error: 'NÃƒÆ’Ã‚Â£o autenticado' }
 
   const admin = supabaseAdmin()
 
-  // Validar permissÃƒÂ£o (verificar que ÃƒÂ© admin da rodada)
+  // Validar permissÃƒÆ’Ã‚Â£o (verificar que ÃƒÆ’Ã‚Â© admin da rodada)
   const { data: round } = await admin
     .from('rounds')
     .select('id, group_id, groups!inner(admin_id)')
@@ -780,7 +780,7 @@ export async function updateFixtureScore(
     .single()
 
   if (!round || (round.groups as any).admin_id !== user.id) {
-    return { success: false, error: 'Sem permissÃƒÂ£o' }
+    return { success: false, error: 'Sem permissÃƒÆ’Ã‚Â£o' }
   }
 
   const { error } = await admin
@@ -854,18 +854,61 @@ export async function updateFixtureTeams(
   return { success: true, fixture }
 }
 
+export async function updatePlayerPositionForRound(
+  roundId: string,
+  playerId: number,
+  position: 'GK' | 'ZAG' | 'LAT' | 'MEI' | 'ATK'
+) {
+  const supabase = await createActionClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) return { success: false, error: 'Nao autenticado' }
+
+  const validPositions = ['GK', 'ZAG', 'LAT', 'MEI', 'ATK']
+  if (!validPositions.includes(position)) {
+    return { success: false, error: 'Posicao invalida.' }
+  }
+
+  const admin = supabaseAdmin()
+
+  const { data: round } = await admin
+    .from('rounds')
+    .select('id, group_id, groups!inner(admin_id)')
+    .eq('id', roundId)
+    .single()
+
+  if (!round || (round.groups as any).admin_id !== user.id) {
+    return { success: false, error: 'Sem permissao' }
+  }
+
+  const { data: player, error } = await admin
+    .from('players')
+    .update({ position })
+    .eq('id', playerId)
+    .select('id, position')
+    .single()
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  revalidatePath(`/admin/rodadas/${roundId}`)
+  revalidatePath('/app/notas')
+  revalidatePath('/app/selecao')
+  return { success: true, player }
+}
+
 /**
- * Recalcular pontuaÃƒÂ§ÃƒÂ£o da rodada apÃƒÂ³s inserir/editar ratings
- * Chama o motor de scoring jÃƒÂ¡ existente
+ * Recalcular pontuaÃƒÆ’Ã‚Â§ÃƒÆ’Ã‚Â£o da rodada apÃƒÆ’Ã‚Â³s inserir/editar ratings
+ * Chama o motor de scoring jÃƒÆ’Ã‚Â¡ existente
  */
 export async function recalculateRound(groupId: string, roundId: string) {
   const supabase = await createActionClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) return { success: false, error: 'NÃƒÂ£o autenticado' }
+  if (authError || !user) return { success: false, error: 'NÃƒÆ’Ã‚Â£o autenticado' }
 
   const admin = supabaseAdmin()
 
-  // Validar que ÃƒÂ© admin do grupo
+  // Validar que ÃƒÆ’Ã‚Â© admin do grupo
   const { data: group } = await admin
     .from('groups')
     .select('id')
@@ -873,7 +916,7 @@ export async function recalculateRound(groupId: string, roundId: string) {
     .eq('admin_id', user.id)
     .single()
 
-  if (!group) return { success: false, error: 'Sem permissÃƒÂ£o' }
+  if (!group) return { success: false, error: 'Sem permissÃƒÆ’Ã‚Â£o' }
 
   try {
     const result = await calculateRoundScores(groupId, roundId)
@@ -897,7 +940,7 @@ export async function recalculateRound(groupId: string, roundId: string) {
 export async function reorderFixtures(roundId: string, fixtureIds: number[]) {
   const supabase = await createActionClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) return { success: false, error: 'NÃƒÂ£o autenticado' }
+  if (authError || !user) return { success: false, error: 'NÃƒÆ’Ã‚Â£o autenticado' }
 
   const admin = supabaseAdmin()
 
@@ -908,7 +951,7 @@ export async function reorderFixtures(roundId: string, fixtureIds: number[]) {
     .single()
 
   if (!round || (round.groups as any).admin_id !== user.id) {
-    return { success: false, error: 'Sem permissÃƒÂ£o' }
+    return { success: false, error: 'Sem permissÃƒÆ’Ã‚Â£o' }
   }
 
   for (let i = 0; i < fixtureIds.length; i++) {
@@ -931,7 +974,7 @@ export async function reorderFixtures(roundId: string, fixtureIds: number[]) {
 export async function toggleRoundFinalized(roundId: string, finalized: boolean) {
   const supabase = await createActionClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) return { success: false, error: 'NÃƒÂ£o autenticado' }
+  if (authError || !user) return { success: false, error: 'NÃƒÆ’Ã‚Â£o autenticado' }
 
   const admin = supabaseAdmin()
 
@@ -942,7 +985,7 @@ export async function toggleRoundFinalized(roundId: string, finalized: boolean) 
     .single()
 
   if (!round || (round.groups as any).admin_id !== user.id) {
-    return { success: false, error: 'Sem permissÃƒÂ£o' }
+    return { success: false, error: 'Sem permissÃƒÆ’Ã‚Â£o' }
   }
 
   const { error } = await admin
@@ -964,17 +1007,17 @@ export async function toggleRoundFinalized(roundId: string, finalized: boolean) 
 
 
 /**
- * DiagnÃƒÂ³stico: Verificar quais ratings foram salvos para uma rodada
- * ÃƒÅ¡til para validar se notas estÃƒÂ£o sendo computadas corretamente
+ * DiagnÃƒÆ’Ã‚Â³stico: Verificar quais ratings foram salvos para uma rodada
+ * ÃƒÆ’Ã…Â¡til para validar se notas estÃƒÆ’Ã‚Â£o sendo computadas corretamente
  */
 export async function verifyRoundRatings(groupId: string, roundId: string) {
   const supabase = await createActionClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) return { success: false, error: 'NÃƒÂ£o autenticado' }
+  if (authError || !user) return { success: false, error: 'NÃƒÆ’Ã‚Â£o autenticado' }
 
   const admin = supabaseAdmin()
 
-  // Validar permissÃƒÂ£o
+  // Validar permissÃƒÆ’Ã‚Â£o
   const { data: round } = await admin
     .from('rounds')
     .select('id, group_id, name, groups!inner(admin_id)')
@@ -983,7 +1026,7 @@ export async function verifyRoundRatings(groupId: string, roundId: string) {
     .single()
 
   if (!round || (round.groups as any).admin_id !== user.id) {
-    return { success: false, error: 'Sem permissÃƒÂ£o' }
+    return { success: false, error: 'Sem permissÃƒÆ’Ã‚Â£o' }
   }
 
   // Buscar todos os ratings da rodada
@@ -998,7 +1041,7 @@ export async function verifyRoundRatings(groupId: string, roundId: string) {
   const withFixtureId = (allRatings ?? []).filter(r => r.fixture_id != null).length
   const withoutFixtureId = (allRatings ?? []).filter(r => r.fixture_id == null).length
 
-  // Ratings problemÃƒÂ¡ticos
+  // Ratings problemÃƒÆ’Ã‚Â¡ticos
   const problematic = (allRatings ?? []).filter(r => r.rating == null || r.fixture_id == null)
 
   console.log(`[RoundDiagnostic] Rodada: ${round.name}`)
@@ -1008,7 +1051,7 @@ export async function verifyRoundRatings(groupId: string, roundId: string) {
   console.log(`[RoundDiagnostic] Com fixture_id: ${withFixtureId}`)
   console.log(`[RoundDiagnostic] Sem fixture_id (NULL): ${withoutFixtureId}`)
   if (problematic.length > 0) {
-    console.log(`[RoundDiagnostic] Ã¢Å¡Â Ã¯Â¸Â ${problematic.length} ratings problemÃƒÂ¡ticos encontrados:`)
+    console.log(`[RoundDiagnostic] ÃƒÂ¢Ã…Â¡Ã‚Â ÃƒÂ¯Ã‚Â¸Ã‚Â ${problematic.length} ratings problemÃƒÆ’Ã‚Â¡ticos encontrados:`)
     problematic.slice(0, 10).forEach(r => {
       console.log(`  - Player ${r.player_id} (${(r.players as any)?.name}): rating=${r.rating}, fixture_id=${r.fixture_id}`)
     })

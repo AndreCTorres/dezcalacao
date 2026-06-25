@@ -4,7 +4,7 @@
 // Fluxo manual: cria jogos, edita notas por partida e recalcula a rodada.
 
 import { useState, useTransition } from 'react'
-import { createManualFixture, upsertBatchRatings, upsertManualRatingsByName, recalculateRound, updateFixtureScore, updateFixtureTeams, reorderFixtures } from './actions'
+import { createManualFixture, upsertBatchRatings, upsertManualRatingsByName, recalculateRound, updateFixtureScore, updateFixtureTeams, updatePlayerPositionForRound, reorderFixtures } from './actions'
 
 type Fixture = {
   id: number
@@ -237,6 +237,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
   const [isSavingOrder, setIsSavingOrder] = useState(false)
   const [selectedFixture, setSelectedFixture] = useState<Fixture | null>(null)
   const [players, setPlayers] = useState<PlayerRating[]>([])
+  const [playerOrder, setPlayerOrder] = useState<Record<number, number>>({})
   const [localRatings, setLocalRatings] = useState<Record<number, { rating: string; minutes: string }>>({})
   const [committedRatings, setCommittedRatings] = useState<Record<number, { rating: string; minutes: string }>>({})
   const [lineupOverrides, setLineupOverrides] = useState<Record<number, 'starter' | 'substitute' | 'not_played'>>({})
@@ -248,6 +249,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
   const [manualBulkResult, setManualBulkResult] = useState<{ matched: number; unmatched: string[]; unmatchedDetails?: ManualUnmatchedDetail[] } | null>(null)
   const [manualCorrections, setManualCorrections] = useState<Record<string, ManualSuggestion>>({})
   const [savingManualBulk, setSavingManualBulk] = useState(false)
+  const [savingPositionPlayerId, setSavingPositionPlayerId] = useState<number | null>(null)
   const [loadingPlayers, setLoadingPlayers] = useState(false)
   const [savingFixture, setSavingFixture] = useState(false)
   const [creatingFixture, startCreateFixture] = useTransition()
@@ -277,6 +279,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
     })
     setLoadingPlayers(true)
     setPlayers([])
+    setPlayerOrder({})
     setLocalRatings({})
     setCommittedRatings({})
     setLineupOverrides({})
@@ -296,6 +299,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
       const data = await res.json()
       const nextPlayers = data.players ?? []
       setPlayers(nextPlayers)
+      setPlayerOrder(Object.fromEntries(nextPlayers.map((p: PlayerRating, index: number) => [p.id, index])))
 
       const initial: Record<number, { rating: string; minutes: string }> = {}
       const initialOverrides: Record<number, 'starter' | 'substitute'> = {}
@@ -365,6 +369,67 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
     }))
   }
 
+  async function updatePlayerPosition(playerId: number, position: 'GK' | 'ZAG' | 'LAT' | 'MEI' | 'ATK') {
+    const previousPlayers = players
+    setPlayers(prev => prev.map(player => player.id === playerId ? { ...player, position } : player))
+    setSavingPositionPlayerId(playerId)
+    const result = await updatePlayerPositionForRound(roundId, playerId, position)
+    setSavingPositionPlayerId(null)
+
+    if (!result.success) {
+      setPlayers(previousPlayers)
+      setFeedback({ type: 'error', msg: result.error ?? 'Nao foi possivel atualizar a posicao.' })
+      return
+    }
+
+    setFeedback({ type: 'success', msg: 'Posicao atualizada.' })
+    setTimeout(() => setFeedback(null), 1800)
+  }
+
+  function positionSelect(player: PlayerRating) {
+    return (
+      <select
+        value={player.position}
+        disabled={savingPositionPlayerId === player.id}
+        onChange={(e) => updatePlayerPosition(player.id, e.target.value as 'GK' | 'ZAG' | 'LAT' | 'MEI' | 'ATK')}
+        title="Corrigir posicao do jogador"
+        className="w-14 bg-gray-700 border border-gray-600 text-white text-[11px] rounded px-1 py-1.5 focus:outline-none focus:border-lime-400 shrink-0"
+      >
+        <option value="GK">GL</option>
+        <option value="ZAG">ZAG</option>
+        <option value="LAT">LAT</option>
+        <option value="MEI">MEI</option>
+        <option value="ATK">ATK</option>
+      </select>
+    )
+  }
+
+  function orderControls(player: PlayerRating, orderedIds: number[]) {
+    const index = orderedIds.indexOf(player.id)
+    return (
+      <div className="flex flex-col gap-0.5 shrink-0">
+        <button
+          type="button"
+          disabled={index <= 0}
+          onClick={() => movePlayerInList(player.id, orderedIds, -1)}
+          title="Subir jogador"
+          className="h-4 w-5 rounded border border-gray-600 bg-gray-800 text-[10px] leading-none text-gray-200 disabled:opacity-25 hover:bg-gray-700"
+        >
+          ^
+        </button>
+        <button
+          type="button"
+          disabled={index < 0 || index >= orderedIds.length - 1}
+          onClick={() => movePlayerInList(player.id, orderedIds, 1)}
+          title="Descer jogador"
+          className="h-4 w-5 rounded border border-gray-600 bg-gray-800 text-[10px] leading-none text-gray-200 disabled:opacity-25 hover:bg-gray-700"
+        >
+          v
+        </button>
+      </div>
+    )
+  }
+
   function commitPlayerValue(playerId: number) {
     setCommittedRatings(prev => ({
       ...prev,
@@ -386,11 +451,32 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
 
   function sortPlayersByPosition(a: PlayerRating, b: PlayerRating) {
     const posOrder: Record<string, number> = { GK: 0, ZAG: 1, LAT: 2, MEI: 3, ATK: 4 }
+    const manualA = playerOrder[a.id]
+    const manualB = playerOrder[b.id]
+    if (manualA !== undefined && manualB !== undefined && manualA !== manualB) return manualA - manualB
     const posA = posOrder[a.position] ?? 99
     const posB = posOrder[b.position] ?? 99
     return posA - posB ||
       getPlayerMinutes(b) - getPlayerMinutes(a) ||
       a.name.localeCompare(b.name)
+  }
+
+  function movePlayerInList(playerId: number, orderedIds: number[], direction: -1 | 1) {
+    const currentIndex = orderedIds.indexOf(playerId)
+    const targetIndex = currentIndex + direction
+    if (currentIndex < 0 || targetIndex < 0 || targetIndex >= orderedIds.length) return
+
+    const nextIds = [...orderedIds]
+    const [removed] = nextIds.splice(currentIndex, 1)
+    nextIds.splice(targetIndex, 0, removed)
+
+    setPlayerOrder(prev => {
+      const next = { ...prev }
+      nextIds.forEach((id, index) => {
+        next[id] = index
+      })
+      return next
+    })
   }
 
   function getTeamLineup(teamPlayers: PlayerRating[]) {
@@ -1457,6 +1543,9 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
                 const substitutes = lineup.substitutes
 
                 const notPlayed = lineup.notPlayed
+                const playedIds = played.map(player => player.id)
+                const substituteIds = substitutes.map(player => player.id)
+                const notPlayedIds = notPlayed.map(player => player.id)
                 /*
                 const notPlayedOld = lineup.notPlayed.sort((a, b) => {
                   // Ordenar por posiÃ§Ã£o
@@ -1488,9 +1577,8 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
 
                           return (
                             <div key={player.id} className={`flex items-center gap-2 px-3 py-2.5 hover:bg-gray-700/30 transition ${played90 ? 'bg-gray-800/40' : 'bg-gray-800/60'}`}>
-                              <span className="text-xs text-gray-500 w-7 shrink-0 text-right">
-                                {POSITION_LABELS[player.position] ?? player.position}
-                              </span>
+                              {orderControls(player, playedIds)}
+                              {positionSelect(player)}
 
                               <span className="flex-1 text-sm text-white truncate">{player.name}</span>
 
@@ -1556,9 +1644,8 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
 
                             return (
                               <div key={player.id} className="flex items-center gap-2 px-3 py-2.5 hover:bg-orange-500/10 transition">
-                                <span className="text-xs text-gray-500 w-7 shrink-0 text-right">
-                                  {POSITION_LABELS[player.position] ?? player.position}
-                                </span>
+                                {orderControls(player, substituteIds)}
+                                {positionSelect(player)}
                                 <span className="flex-1 text-sm text-white truncate">{player.name}</span>
                                 <span className="text-xs text-orange-300 w-24 text-center shrink-0">
                                   {entryMinute}' / {mins}min
@@ -1612,9 +1699,8 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
 
                           return (
                             <div key={player.id} className="flex items-center gap-2 px-3 py-2.5 hover:bg-gray-700/20 transition opacity-60">
-                              <span className="text-xs text-gray-600 w-7 shrink-0 text-right">
-                                {POSITION_LABELS[player.position] ?? player.position}
-                              </span>
+                              {orderControls(player, notPlayedIds)}
+                              {positionSelect(player)}
 
                               <span className="flex-1 text-sm text-gray-400 truncate">{player.name}</span>
 
