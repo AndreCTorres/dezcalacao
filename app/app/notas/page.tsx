@@ -53,7 +53,7 @@ export default async function NotasDaRodadaPage({
   if (!groupId) {
     return (
       <Shell>
-        <Empty title="VocÃª nÃ£o estÃ¡ em um grupo ainda" subtitle="Aguarde um convite do admin." />
+        <Empty title="Voce nao esta em um grupo ainda" subtitle="Aguarde um convite do admin." />
       </Shell>
     )
   }
@@ -125,7 +125,7 @@ export default async function NotasDaRodadaPage({
       ratedByFixture.get(key)!.push({
         player_id: r.player_id as number,
         name: p.name as string,
-        team_name: (p.team_name as string) ?? 'â€”',
+        team_name: (p.team_name as string) ?? '-',
         position: (p.position as string) ?? '',
         rating: r.rating as number,
         minutes: (r.minutes as number) ?? 0,
@@ -222,7 +222,7 @@ export default async function NotasDaRodadaPage({
         {/* Voltar no topo */}
         <div className="mb-3">
           <Link href="/app" className="text-gray-400 text-sm font-semibold hover:text-lime-400 transition">
-            â† Voltar
+          Voltar
           </Link>
         </div>
 
@@ -261,11 +261,11 @@ export default async function NotasDaRodadaPage({
           href={`/app/selecao?round=${selectedRoundId}`}
           className="block text-center text-sm font-semibold text-lime-300 bg-lime-400/10 border border-lime-400/30 rounded-xl py-2 mb-4 hover:bg-lime-400/20 transition"
         >
-          ðŸ‘‘ Ver a SeleÃ§Ã£o da Rodada (11 melhores)
+          Ver a Selecao da Rodada (11 melhores)
         </Link>
 
         {games.length === 0 ? (
-          <Empty title="Sem notas nesta rodada ainda" subtitle="Quando o admin lanÃ§ar as notas, os jogos aparecem aqui." />
+          <Empty title="Sem notas nesta rodada ainda" subtitle="Quando o admin lancar as notas, os jogos aparecem aqui." />
         ) : (
           <RoundGames games={games} />
         )}
@@ -289,7 +289,7 @@ function Empty({ title, subtitle }: { title: string; subtitle: string }) {
       <p className="text-gray-400">{subtitle}</p>
       <div className="mt-6">
         <Link href="/app" className="text-lime-400 text-sm font-semibold hover:underline">
-          â† Voltar
+          Voltar
         </Link>
       </div>
     </div>

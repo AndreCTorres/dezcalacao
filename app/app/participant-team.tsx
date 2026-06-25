@@ -3,8 +3,8 @@
 // app/app/participant-team.tsx
 // Exibe o time do participante (titulares + reservas)
 
-import Image from 'next/image'
 import Link from 'next/link'
+import { PlayerPhoto } from './player-photo'
 
 type TeamPlayer = {
   id: string
@@ -89,13 +89,12 @@ function PlayerCard({ player, number }: { player: any; number: number | null }) 
     <div className="flex items-center gap-3 p-3 bg-gray-700/50 rounded-lg hover:bg-gray-700 transition">
       {player.photo_url ? (
         <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-gray-600">
-          <Image
+          <PlayerPhoto
             src={player.photo_url}
             alt={player.name}
-            width={48}
-            height={48}
+            size={48}
             className="w-full h-full object-cover object-top"
-            unoptimized
+            fallbackClassName="text-xs"
           />
         </div>
       ) : (

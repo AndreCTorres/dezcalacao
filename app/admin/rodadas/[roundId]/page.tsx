@@ -154,7 +154,7 @@ export default async function RoundRatingsPage({ params }: PageProps) {
         <div className="mb-8">
           <div className="flex justify-between items-start mb-4">
             <Link href="/admin/rodadas" className="text-lime-400 hover:text-lime-300 text-sm">
-              ÃƒÂ¢Ã¢â‚¬Â Ã‚Â Voltar para rodadas
+              Voltar para rodadas
             </Link>
             <LogoutButton />
           </div>
@@ -168,7 +168,7 @@ export default async function RoundRatingsPage({ params }: PageProps) {
               round.status === 'open'   ? 'bg-lime-500/20 text-lime-400' :
                                          'bg-gray-500/20 text-gray-400'
             }`}>
-              {round.status === 'scored' ? 'ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Pontuada' : round.status === 'open' ? 'ÃƒÂ°Ã…Â¸Ã…Â¸Ã‚Â¢ Aberta' : 'ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ¢â‚¬â„¢ Travada'}
+              {round.status === 'scored' ? 'Pontuada' : round.status === 'open' ? 'Aberta' : 'Travada'}
             </span>
             {hasFinalizationColumn && (
               <RoundFinalizationToggle roundId={roundId} finalizedAt={(round as any).finalized_at ?? null} />
@@ -202,9 +202,9 @@ export default async function RoundRatingsPage({ params }: PageProps) {
         <div className="mt-8 p-4 bg-gray-800/50 rounded-lg border border-gray-700 text-xs text-gray-500 space-y-1">
           <p className="font-semibold text-gray-400 text-sm mb-2">Como funciona:</p>
           <p>1. Clique em um jogo para ver e editar as notas dos jogadores</p>
-          <p>2. Use "Recalcular PontuaÃƒÆ’Ã‚Â§ÃƒÆ’Ã‚Â£o" apÃƒÆ’Ã‚Â³s inserir todas as notas da rodada</p>
-          <p>3. Minutos sÃƒÂ£o registrados apenas para conferÃƒÂªncia; a nota conta integralmente</p>
-          <p>4. Os participantes verÃƒÆ’Ã‚Â£o as notas na seÃƒÆ’Ã‚Â§ÃƒÆ’Ã‚Â£o "ÃƒÂ¢Ã‚Â­Ã‚Â Notas dos Jogadores"</p>
+          <p>2. Use "Recalcular Pontuacao" apos inserir todas as notas da rodada</p>
+          <p>3. Minutos sao registrados apenas para conferencia; a nota conta integralmente</p>
+          <p>4. Os participantes verao as notas na secao "Notas dos Jogadores"</p>
         </div>
       </div>
     </div>

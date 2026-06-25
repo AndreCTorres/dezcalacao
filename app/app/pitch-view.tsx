@@ -4,8 +4,8 @@
 // Campinho visual com jogadores posicionados em campo
 // Formação: 1 GK | 2 ZAG | 2 LAT | 3 MEI | 3 ATK
 
-import Image from 'next/image'
 import Link from 'next/link'
+import { PlayerPhoto } from './player-photo'
 
 export type PitchPlayer = {
   id: string
@@ -104,13 +104,12 @@ function PlayerToken({
           border-gray-900
         `}>
           {hasPhoto ? (
-            <Image
-              src={player.players.photo_url!}
+            <PlayerPhoto
+              src={player.players.photo_url}
               alt={player.players.name}
-              width={isSmall ? 44 : 56}
-              height={isSmall ? 44 : 56}
+              size={isSmall ? 44 : 56}
               className="w-full h-full object-cover object-top"
-              unoptimized
+              fallbackClassName={isSmall ? 'text-xs' : 'text-sm'}
             />
           ) : (
             <span className={isSmall ? 'text-base' : 'text-xl'}>👤</span>

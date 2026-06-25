@@ -300,6 +300,23 @@ export async function upsertManualRatingsByName(
     return parts[parts.length - 1] ?? ''
   }
 
+  const firstToken = (value: string) => tokens(value)[0] ?? ''
+
+  const firstInitial = (value: string) => firstToken(value)[0] ?? ''
+
+  const hasLeadingInitial = (value: string) => {
+    const parts = tokens(value)
+    return parts.length >= 2 && parts[0].length === 1
+  }
+
+  const hasInitialConflict = (source: string, target: string) => {
+    const sourceLast = lastToken(source)
+    const targetLast = lastToken(target)
+    if (!sourceLast || sourceLast !== targetLast) return false
+    if (!hasLeadingInitial(source) && !hasLeadingInitial(target)) return false
+    return firstInitial(source) !== firstInitial(target)
+  }
+
   const tokenScore = (source: string, target: string) => {
     const srcTokens = new Set(tokens(source))
     const targetTokens = new Set(tokens(target))
@@ -412,6 +429,10 @@ export async function upsertManualRatingsByName(
       'd gul': [{ team: 'turkey', names: ['gul', 'deniz gul', 'd gul'] }],
       'e elmali': [{ team: 'turkey', names: ['elmali', 'eren elmali', 'e elmali'] }],
       'o kokcu': [{ team: 'turkey', names: ['kokcu', 'orkan kokcu', 'o kokcu'] }],
+      'k lenini': [{ team: 'cape verde islands', names: ['kevin pina', 'k pina'] }],
+      'g tavares': [{ team: 'cape verde islands', names: ['gilson benchimol', 'gilson tavares benchimol'] }],
+      'michael wood': [{ team: 'new zealand', names: ['m woud'] }],
+      'm wood': [{ team: 'new zealand', names: ['m woud'] }],
     }
     for (const alias of staticAliases[normalize(name)] ?? []) {
       if (team && !teamsMatch(alias.team, team)) continue
@@ -510,6 +531,8 @@ export async function upsertManualRatingsByName(
   }
 
   const namesCompatible = (source: string, candidate: string) => {
+    if (hasInitialConflict(source, candidate)) return false
+
     const sourceVariants = nameVariants(source)
     const candidateVariants = nameVariants(candidate)
     return sourceVariants.some((sourceVariant) =>
@@ -558,17 +581,20 @@ export async function upsertManualRatingsByName(
           const playerTeam = normalize(player.team_name ?? '')
           const overlap = tokenScore(entry.name, player.name)
           const sharedStrongToken = hasStrongTokenMatch(entry.name, player.name)
-          const sameLastToken = lastToken(entry.name) && lastToken(entry.name) === lastToken(player.name)
+          const initialConflict = hasInitialConflict(entry.name, player.name)
+          const sameLastToken = !initialConflict && lastToken(entry.name) && lastToken(entry.name) === lastToken(player.name)
           const sameInitials = initials(player.name) === initials(entry.name)
           const variantMatch = namesCompatible(entry.name, player.name)
           const nameMatches =
-            variantMatch ||
-            playerName.includes(entryName) ||
-            entryName.includes(playerName) ||
-            sameLastToken ||
-            sharedStrongToken ||
-            overlap >= 0.4 ||
-            (sameInitials && overlap >= 0.2)
+            !initialConflict && (
+              variantMatch ||
+              playerName.includes(entryName) ||
+              entryName.includes(playerName) ||
+              sameLastToken ||
+              sharedStrongToken ||
+              overlap >= 0.4 ||
+              (sameInitials && overlap >= 0.2)
+            )
           const teamMatches = !entryTeam || teamsMatch(playerTeam, entryTeam)
           const score =
             (nameMatches ? 2 : 0) +
@@ -610,6 +636,7 @@ export async function upsertManualRatingsByName(
           )
         const suggestionPool = scopedPlayers.length > 0 ? scopedPlayers : (players as any[])
         const suggestions = suggestionPool
+          .filter((player) => !hasInitialConflict(entry.name, player.name))
           .map((player) => ({
             id: player.id as number,
             name: player.name as string,
@@ -634,7 +661,7 @@ export async function upsertManualRatingsByName(
       candidates.find((p) => entryTeam && teamsMatch(p.team_name, entryTeam)) ??
       candidates.find((p) => namesCompatible(entry.name, p.name)) ??
       candidates.find((p) => hasStrongTokenMatch(entry.name, p.name)) ??
-      candidates.find((p) => lastToken(entry.name) && lastToken(entry.name) === lastToken(p.name)) ??
+      candidates.find((p) => !hasInitialConflict(entry.name, p.name) && lastToken(entry.name) && lastToken(entry.name) === lastToken(p.name)) ??
       candidates.find((p) => tokenScore(entry.name, p.name) >= 0.4) ??
       candidates.find((p) => initials(p.name) === initials(entry.name) && tokenScore(entry.name, p.name) >= 0.2) ??
       candidates.find((p) => p.team_name) ??

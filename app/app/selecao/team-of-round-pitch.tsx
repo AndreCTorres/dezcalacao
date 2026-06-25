@@ -4,7 +4,7 @@
 // Campinho da "Seleção da Rodada": XI 4-3-3 (GK, 4 defensores, 3 meias, 3 atacantes)
 // com as maiores notas da rodada. Destaca o craque (maior nota) com coroa e brilho.
 
-import Image from 'next/image'
+import { PlayerPhoto } from '../player-photo'
 
 export type TotrPlayer = {
   player_id: number
@@ -79,7 +79,13 @@ function PlayerToken({ player, isBest }: { player: TotrPlayer; isBest: boolean }
             flex items-center justify-center`}
         >
           {hasPhoto ? (
-            <Image src={player.photo_url!} alt={player.name} width={56} height={56} className="w-full h-full object-cover object-top" unoptimized />
+            <PlayerPhoto
+              src={player.photo_url}
+              alt={player.name}
+              size={56}
+              className="w-full h-full object-cover object-top"
+              fallbackClassName="text-sm"
+            />
           ) : (
             <span className="text-xl">👤</span>
           )}

@@ -47,7 +47,7 @@ export default async function SelecaoDaRodadaPage({
   if (!groupId) {
     return (
       <Shell>
-        <Empty title="VocÃª nÃ£o estÃ¡ em um grupo ainda" subtitle="Aguarde um convite do admin." />
+        <Empty title="Voce nao esta em um grupo ainda" subtitle="Aguarde um convite do admin." />
       </Shell>
     )
   }
@@ -113,7 +113,7 @@ export default async function SelecaoDaRodadaPage({
         return {
           player_id: r.player_id as number,
           name: p.name as string,
-          team_name: (p.team_name as string) ?? '',
+          team_name: (p.team_name as string) ?? '-',
           position: (p.position as Position) ?? 'MEI',
           photo_url: (p.photo_url as string) ?? null,
           number: (p.number as number) ?? null,
@@ -134,7 +134,7 @@ export default async function SelecaoDaRodadaPage({
         {/* Voltar no topo */}
         <div className="mb-3">
           <Link href="/app" className="text-gray-400 text-sm font-semibold hover:text-lime-400 transition">
-            â† Voltar
+            Voltar
           </Link>
         </div>
 
@@ -144,11 +144,11 @@ export default async function SelecaoDaRodadaPage({
             className="text-2xl font-black uppercase tracking-tight"
             style={{ fontFamily: 'Anton, sans-serif' }}
           >
-            <span style={{ color: '#c5f24a' }}>SeleÃ§Ã£o</span>
-            <span className="text-white"> da Rodada</span>
+            <span style={{ color: '#c5f24a' }}>SELECAO</span>
+            <span className="text-white"> DA RODADA</span>
           </h1>
           <p className="text-gray-400 text-sm mt-1">
-            Os 11 melhores de <strong className="text-white">{selectedRound.name}</strong> Â· 4-3-3
+            Os 11 melhores de <strong className="text-white">{selectedRound.name}</strong> - 4-3-3
           </p>
         </div>
 
@@ -177,14 +177,14 @@ export default async function SelecaoDaRodadaPage({
             {/* Craque da rodada */}
             {totr.best && (
               <div className="mb-4 flex items-center gap-3 rounded-2xl border border-yellow-400/40 bg-yellow-400/10 p-3">
-                <span className="text-2xl">ðŸ‘‘</span>
+                <span className="text-2xl">#1</span>
                 <div className="flex-1 min-w-0">
                   <p className="text-[10px] uppercase tracking-widest text-yellow-400 font-bold">
                     Craque da Rodada
                   </p>
                   <p className="text-white font-bold truncate">
                     {totr.best.name}{' '}
-                    <span className="text-gray-400 font-normal">Â· {totr.best.team_name}</span>
+                    <span className="text-gray-400 font-normal">- {totr.best.team_name}</span>
                   </p>
                 </div>
                 <span className="font-mono font-black text-yellow-400 text-xl">
@@ -199,14 +199,14 @@ export default async function SelecaoDaRodadaPage({
             {/* Aviso de XI incompleto (faltam notas para alguma posiÃ§Ã£o) */}
             {totr.starters.length < 11 && (
               <p className="text-center text-gray-500 text-xs mt-3">
-                XI parcial: faltam notas para preencher todas as posiÃ§Ãµes.
+                XI parcial: faltam notas para preencher todas as posicoes.
               </p>
             )}
           </>
         ) : (
           <Empty
             title="Sem notas nesta rodada ainda"
-            subtitle="Quando o admin lanÃ§ar as notas, o XI aparece aqui."
+            subtitle="Quando o admin lancar as notas, o XI aparece aqui."
           />
         )}
 
@@ -215,10 +215,10 @@ export default async function SelecaoDaRodadaPage({
             href={`/app/notas?round=${selectedRoundId}`}
             className="text-lime-300 text-sm font-semibold hover:underline"
           >
-            ðŸ“‹ Ver as notas de cada jogo
+            Ver as notas de cada jogo
           </Link>
           <Link href="/app" className="text-gray-400 text-sm font-semibold hover:underline">
-            â† Voltar
+            Voltar
           </Link>
         </div>
       </div>
@@ -241,7 +241,7 @@ function Empty({ title, subtitle }: { title: string; subtitle: string }) {
       <p className="text-gray-400">{subtitle}</p>
       <div className="mt-6">
         <Link href="/app" className="text-lime-400 text-sm font-semibold hover:underline">
-          â† Voltar
+            Voltar
         </Link>
       </div>
     </div>

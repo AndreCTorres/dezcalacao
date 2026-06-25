@@ -5,9 +5,9 @@
 // que pontuaram melhor que os titulares, e confirmar o score final.
 
 import { useState } from 'react'
-import Image from 'next/image'
 import { confirmPostRoundSwaps, resetPostRoundSwaps } from './post-round-actions'
 import type { PostRoundPlayer, PostRoundSwap } from './post-round-actions'
+import { PlayerPhoto } from './player-photo'
 
 type Props = {
   groupMemberId: string
@@ -42,8 +42,13 @@ function PlayerAvatar({ player, size = 'md' }: { player: PostRoundPlayer; size?:
       style={{ width: sz, height: sz }}
     >
       {player.photo_url ? (
-        <Image src={player.photo_url} alt={player.name} width={sz} height={sz}
-          className="w-full h-full object-cover object-top" unoptimized />
+        <PlayerPhoto
+          src={player.photo_url}
+          alt={player.name}
+          size={sz}
+          className="w-full h-full object-cover object-top"
+          fallbackClassName="text-xs"
+        />
       ) : (
         <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">👤</div>
       )}

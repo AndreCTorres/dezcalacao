@@ -3,7 +3,7 @@
 // app/admin/draft/player-preview.tsx
 // Preview de como os jogadores vão aparecer com fotos
 
-import Image from 'next/image'
+import { PlayerPhoto } from '../../app/player-photo'
 import type { Position } from '@/lib/types'
 
 type Player = {
@@ -36,12 +36,12 @@ export function PlayerPreview({ player, selected, onClick }: PlayerPreviewProps)
       <div className="bg-gray-700 aspect-square relative flex flex-col items-center justify-center">
         {player.photo_url ? (
           <>
-            <Image
+            <PlayerPhoto
               src={player.photo_url}
               alt={player.name}
-              fill
-              className="object-cover object-top"
-              unoptimized // API-Football usa CDN externo
+              size={120}
+              className="w-full h-full object-cover object-top"
+              fallbackClassName="text-sm"
             />
             {/* Overlay com informações */}
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-2">
