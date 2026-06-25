@@ -1,29 +1,29 @@
-# 🔍 Guia de Conferência de Ratings
+# ðŸ” Guia de ConferÃªncia de Ratings
 
-Componentes para verificar quais jogadores têm notas e identificar faltantes rapidamente.
+Componentes para verificar quais jogadores tÃªm notas e identificar faltantes rapidamente.
 
 ---
 
-## 📋 Componentes Criados
+## ðŸ“‹ Componentes Criados
 
 ### 1. `RoundVerification` (round-verification.tsx)
-**O que é:** Componente de conferência completo com indicadores visuais
+**O que Ã©:** Componente de conferÃªncia completo com indicadores visuais
 
-**Características:**
-- ✅ Lista 11 titulares com status de rating
-- 🔄 Mostra reservas que entraram (substituições)
-- ⚠️ Alertas visuais:
-  - Faltam notas (❌ em vermelho)
-  - Subs não usadas (⚠️ em laranja)
-- 📊 Indicador de progresso (barra de progresso)
-- 🎯 Agrupa por posição (GK, ZAG, LAT, MEI, ATK)
+**CaracterÃ­sticas:**
+- âœ… Lista 11 titulares com status de rating
+- ðŸ”„ Mostra reservas que entraram (substituiÃ§Ãµes)
+- âš ï¸ Alertas visuais:
+  - Faltam notas (âŒ em vermelho)
+  - Subs nÃ£o usadas (âš ï¸ em laranja)
+- ðŸ“Š Indicador de progresso (barra de progresso)
+- ðŸŽ¯ Agrupa por posiÃ§Ã£o (GK, ZAG, LAT, MEI, ATK)
 
 **Uso:**
 ```tsx
 import { RoundVerification } from '@/app/app/round-verification'
 
 <RoundVerification
-  memberName="André"
+  memberName="AndrÃ©"
   round={1}
   starters={startersArray}
   bench={benchArray}
@@ -31,23 +31,22 @@ import { RoundVerification } from '@/app/app/round-verification'
 />
 ```
 
-**Ícones de Status:**
-- ✅ Tem nota e jogou ≥20 min (Verde)
-- ⭐ Nota excelente ≥8.0 (Amarelo)
-- ⏱️ Tem nota mas <20 min (Laranja)
-- ❌ Falta nota (Vermelho)
+**Ãcones de Status:**
+- âœ… Tem nota (Verde)
+- â­ Nota excelente â‰¥8.0 (Amarelo)
+- âŒ Falta nota (Vermelho)
 
 ---
 
 ### 2. `MemberRoundChecker` (member-round-checker.tsx)
-**O que é:** Wrapper com estatísticas rápidas para modal/tab
+**O que Ã©:** Wrapper com estatÃ­sticas rÃ¡pidas para modal/tab
 
-**Características:**
-- 📊 Cobertura percentual (80%, 90%, etc)
-- 📈 Total de pontos
-- 💡 Dicas de conferência
-- 🖨️ Botão de print/exportar
-- ✕ Botão de fechar
+**CaracterÃ­sticas:**
+- ðŸ“Š Cobertura percentual (80%, 90%, etc)
+- ðŸ“ˆ Total de pontos
+- ðŸ’¡ Dicas de conferÃªncia
+- ðŸ–¨ï¸ BotÃ£o de print/exportar
+- âœ• BotÃ£o de fechar
 
 **Uso:**
 ```tsx
@@ -88,13 +87,13 @@ type MemberRoundData = {
 ---
 
 ### 3. `RoundDetailsExpanded` (round-details-expanded.tsx)
-**O que é:** Versão avançada do round-details com verificação integrada
+**O que Ã©:** VersÃ£o avanÃ§ada do round-details com verificaÃ§Ã£o integrada
 
-**Características:**
-- 📊 Lista todas as rodadas
-- 🔼 Expandível por rodada
-- ✅ Mostra verificação do seu time
-- 🏆 Ranking completo da rodada
+**CaracterÃ­sticas:**
+- ðŸ“Š Lista todas as rodadas
+- ðŸ”¼ ExpandÃ­vel por rodada
+- âœ… Mostra verificaÃ§Ã£o do seu time
+- ðŸ† Ranking completo da rodada
 - Carregamento lazy dos dados
 
 **Uso:**
@@ -111,66 +110,66 @@ import { RoundDetailsExpanded } from '@/app/app/round-details-expanded'
 
 ---
 
-## 🎯 Casos de Uso
+## ðŸŽ¯ Casos de Uso
 
-### Caso 1: Conferência Rápida (Admin)
-Você coletou ratings e quer conferir antes de recalcular pontuação.
+### Caso 1: ConferÃªncia RÃ¡pida (Admin)
+VocÃª coletou ratings e quer conferir antes de recalcular pontuaÃ§Ã£o.
 
 **Workflow:**
 1. Abra `/admin/rodadas/[roundId]`
 2. Clique em um membro
-3. Sistema mostra verificação:
-   - 11 titulares com ✅/❌
-   - Quantos têm nota
+3. Sistema mostra verificaÃ§Ã£o:
+   - 11 titulares com âœ…/âŒ
+   - Quantos tÃªm nota
    - Alertas de faltantes
 
-### Caso 2: Validação Antes de Publicar
-Antes de divulgar scores, você quer ter certeza que todos têm notas.
+### Caso 2: ValidaÃ§Ã£o Antes de Publicar
+Antes de divulgar scores, vocÃª quer ter certeza que todos tÃªm notas.
 
 **Workflow:**
 1. Para cada membro, abra MemberRoundChecker
-2. Veja a cobertura (%) — se < 100%, faltam notas
+2. Veja a cobertura (%) â€” se < 100%, faltam notas
 3. Identifique quem falta rating
-4. Corrija manualmente no banco se necessário
-5. Recalcule pontuação
+4. Corrija manualmente no banco se necessÃ¡rio
+5. Recalcule pontuaÃ§Ã£o
 
-### Caso 3: Debugging de Não Casamento
-Alguns times não tiveram score calculado. Quais jogadores faltam?
+### Caso 3: Debugging de NÃ£o Casamento
+Alguns times nÃ£o tiveram score calculado. Quais jogadores faltam?
 
 **Workflow:**
 1. Clique na rodada em RoundDetailsExpanded
-2. Expande e mostra a verificação
-3. Vê exatamente quem não tem nota
+2. Expande e mostra a verificaÃ§Ã£o
+3. VÃª exatamente quem nÃ£o tem nota
 4. Procura na imagem do jogo e insere manualmente
 
 ---
 
-## 🎨 Indicadores Visuais
+## ðŸŽ¨ Indicadores Visuais
 
 ### Cores por Status
 ```
-✅ Verde (7.0-7.9)    = Bom
-⭐ Amarelo (≥8.0)    = Excelente
-⏱️  Laranja (<20min)   = Substituição incompleta
-❌ Vermelho (sem nota) = Crítico — CONFERIR
+âœ… Verde (7.0-7.9)    = Bom
+â­ Amarelo (â‰¥8.0)    = Excelente
+Laranja                 = Alerta operacional, não afeta pontuação
+âŒ Vermelho (sem nota) = CrÃ­tico â€” CONFERIR
 ```
 
 ### Alertas
 ```
-⚠️ FALTAM NOTAS        = X jogadores sem rating
-⚠️ SUBS NÃO USADAS     = Banco não totalmente acionado
+âš ï¸ FALTAM NOTAS        = X jogadores sem rating
+âš ï¸ SUBS NÃƒO USADAS     = Banco nÃ£o totalmente acionado
 ```
 
 ---
 
-## 🔧 Exemplo Prático
+## ðŸ”§ Exemplo PrÃ¡tico
 
-Vamos dizer que você tem dados assim:
+Vamos dizer que vocÃª tem dados assim:
 
 ```tsx
 const memberData: MemberRoundData = {
   memberId: 'abc123',
-  memberName: 'André',
+  memberName: 'AndrÃ©',
   round: 1,
   starters: [
     {
@@ -190,7 +189,7 @@ const memberData: MemberRoundData = {
       player_id: 456,
       slot: 'bench',
       position_slot: 'ZAG',
-      rating: null, // ⚠️ SEM NOTA
+      rating: null, // âš ï¸ SEM NOTA
       minutes: 0,
       players: { id: 456, name: 'Player X', team_name: 'Brazil', position: 'D' }
     },
@@ -202,28 +201,28 @@ const memberData: MemberRoundData = {
 }
 ```
 
-**O componente mostrará:**
+**O componente mostrarÃ¡:**
 ```
-👥 11 Titulares
-  • 10/11 com notas ⚠️ FALTAM NOTAS
+ðŸ‘¥ 11 Titulares
+  â€¢ 10/11 com notas âš ï¸ FALTAM NOTAS
 
-🔄 Substituições (1)
-  • Player X entrou no lugar de Player Y
-    ❌ SEM NOTA
+ðŸ”„ SubstituiÃ§Ãµes (1)
+  â€¢ Player X entrou no lugar de Player Y
+    âŒ SEM NOTA
 
-⚠️ ALERTAS
-  • Falta 1 nota crítica
-  • 4 subs não foram usadas
+âš ï¸ ALERTAS
+  â€¢ Falta 1 nota crÃ­tica
+  â€¢ 4 subs nÃ£o foram usadas
 ```
 
 ---
 
-## 💡 Dicas de Uso
+## ðŸ’¡ Dicas de Uso
 
-### Para Admin (Conferência)
-1. **Antes de recalcular:** Rode a verificação para cada membro
+### Para Admin (ConferÃªncia)
+1. **Antes de recalcular:** Rode a verificaÃ§Ã£o para cada membro
 2. **Se tiver <100% cobertura:** Identifique faltantes manualmente
-3. **Se tem alertas de subs:** Confira se o jogo realmente não usou substituições
+3. **Se tem alertas de subs:** Confira se o jogo realmente nÃ£o usou substituiÃ§Ãµes
 
 ### Para Criador de Ratings
 1. **Ao inserir dados:** Use o verificador para confirmar
@@ -244,20 +243,20 @@ GROUP BY gm.id;
 
 ---
 
-## 🚀 Integração Sugerida
+## ðŸš€ IntegraÃ§Ã£o Sugerida
 
 ### Na Home (`/app/page.tsx`)
-Adicione um botão "🔍 Conferir Rodada" que abre um modal com o verificador.
+Adicione um botÃ£o "ðŸ” Conferir Rodada" que abre um modal com o verificador.
 
 ### Na Admin (`/admin/rodadas/[roundId]/page.tsx`)
-Adicione uma aba "Conferência" com verificação para cada membro.
+Adicione uma aba "ConferÃªncia" com verificaÃ§Ã£o para cada membro.
 
 ### Em Round Details
-Substitua `RoundDetails` por `RoundDetailsExpanded` para ter verificação integrada.
+Substitua `RoundDetails` por `RoundDetailsExpanded` para ter verificaÃ§Ã£o integrada.
 
 ---
 
-## 📦 Estrutura de Tipos
+## ðŸ“¦ Estrutura de Tipos
 
 ```typescript
 // Player com rating
@@ -293,13 +292,13 @@ type MemberRoundData = {
 
 ---
 
-## 🎯 Próximos Passos
+## ðŸŽ¯ PrÃ³ximos Passos
 
-1. **Integrar em Admin UI** - Adicione botão "Conferência" em `/admin/rodadas/[roundId]`
-2. **Modal Reutilizável** - Crie `CheckerModal` que wrappa `MemberRoundChecker`
+1. **Integrar em Admin UI** - Adicione botÃ£o "ConferÃªncia" em `/admin/rodadas/[roundId]`
+2. **Modal ReutilizÃ¡vel** - Crie `CheckerModal` que wrappa `MemberRoundChecker`
 3. **API de Dados** - Crie `/api/members/[memberId]/round/[roundId]/verification` que retorna `MemberRoundData`
-4. **Teste E2E** - Valide a conferência em Playwright
+4. **Teste E2E** - Valide a conferÃªncia em Playwright
 
 ---
 
-**Última atualização:** Junho 2026
+**Ãšltima atualizaÃ§Ã£o:** Junho 2026

@@ -1,6 +1,6 @@
 // app/app/notas/page.tsx
-// Notas da Rodada (visão do participante): um card por jogo (acordeão), com os
-// jogadores separados por seleção e ordenados pela nota. Read-only, para todos.
+// Notas da Rodada (visÃ£o do participante): um card por jogo (acordeÃ£o), com os
+// jogadores separados por seleÃ§Ã£o e ordenados pela nota. Read-only, para todos.
 
 import { createActionClient, supabaseAdmin } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
@@ -53,7 +53,7 @@ export default async function NotasDaRodadaPage({
   if (!groupId) {
     return (
       <Shell>
-        <Empty title="Você não está em um grupo ainda" subtitle="Aguarde um convite do admin." />
+        <Empty title="VocÃª nÃ£o estÃ¡ em um grupo ainda" subtitle="Aguarde um convite do admin." />
       </Shell>
     )
   }
@@ -73,8 +73,8 @@ export default async function NotasDaRodadaPage({
     )
   }
 
-  // Rodada atual automática: a mais recente que JÁ tem notas; se nenhuma tiver,
-  // a que está aberta; senão a última criada. (Evita ter que clicar.)
+  // Rodada atual automÃ¡tica: a mais recente que JÃ tem notas; se nenhuma tiver,
+  // a que estÃ¡ aberta; senÃ£o a Ãºltima criada. (Evita ter que clicar.)
   const roundIds = roundList.map((r) => r.id)
   const { data: ratedRows } = await admin
     .from('player_round_ratings')
@@ -101,7 +101,7 @@ export default async function NotasDaRodadaPage({
     .order('id', { ascending: true })
   const fixtureList = fixtures ?? []
 
-  // Notas + jogadores (duas queries, junta em memória)
+  // Notas + jogadores (duas queries, junta em memÃ³ria)
   const { data: ratings } = await admin
     .from('player_round_ratings')
     .select('player_id, fixture_id, rating, minutes')
@@ -125,7 +125,7 @@ export default async function NotasDaRodadaPage({
       ratedByFixture.get(key)!.push({
         player_id: r.player_id as number,
         name: p.name as string,
-        team_name: (p.team_name as string) ?? '—',
+        team_name: (p.team_name as string) ?? 'â€”',
         position: (p.position as string) ?? '',
         rating: r.rating as number,
         minutes: (r.minutes as number) ?? 0,
@@ -133,8 +133,8 @@ export default async function NotasDaRodadaPage({
     }
   }
 
-  // Montar os blocos de jogo, separando por seleção (agrupa pelo team_name do
-  // jogador — sempre correto, mesmo que o título do jogo esteja em outro idioma)
+  // Montar os blocos de jogo, separando por seleÃ§Ã£o (agrupa pelo team_name do
+  // jogador â€” sempre correto, mesmo que o tÃ­tulo do jogo esteja em outro idioma)
   const games: GameBlock[] = []
 
   function buildTeams(players: RatedPlayer[], homeHint?: string, awayHint?: string) {
@@ -145,7 +145,7 @@ export default async function NotasDaRodadaPage({
     }
     let teams = Array.from(byTeam.entries()).map(([team_name, ps]) => ({
       team_name,
-      players: ps.sort((a, b) => b.rating - a.rating || b.minutes - a.minutes),
+      players: ps.sort((a, b) => b.rating - a.rating),
     }))
     // Ordenar tentando colocar o mandante primeiro (match aproximado)
     if (homeHint) {
@@ -222,7 +222,7 @@ export default async function NotasDaRodadaPage({
         {/* Voltar no topo */}
         <div className="mb-3">
           <Link href="/app" className="text-gray-400 text-sm font-semibold hover:text-lime-400 transition">
-            ← Voltar
+            â† Voltar
           </Link>
         </div>
 
@@ -256,16 +256,16 @@ export default async function NotasDaRodadaPage({
           })}
         </div>
 
-        {/* Link para a Seleção da Rodada */}
+        {/* Link para a SeleÃ§Ã£o da Rodada */}
         <Link
           href={`/app/selecao?round=${selectedRoundId}`}
           className="block text-center text-sm font-semibold text-lime-300 bg-lime-400/10 border border-lime-400/30 rounded-xl py-2 mb-4 hover:bg-lime-400/20 transition"
         >
-          👑 Ver a Seleção da Rodada (11 melhores)
+          ðŸ‘‘ Ver a SeleÃ§Ã£o da Rodada (11 melhores)
         </Link>
 
         {games.length === 0 ? (
-          <Empty title="Sem notas nesta rodada ainda" subtitle="Quando o admin lançar as notas, os jogos aparecem aqui." />
+          <Empty title="Sem notas nesta rodada ainda" subtitle="Quando o admin lanÃ§ar as notas, os jogos aparecem aqui." />
         ) : (
           <RoundGames games={games} />
         )}
@@ -289,7 +289,7 @@ function Empty({ title, subtitle }: { title: string; subtitle: string }) {
       <p className="text-gray-400">{subtitle}</p>
       <div className="mt-6">
         <Link href="/app" className="text-lime-400 text-sm font-semibold hover:underline">
-          ← Voltar
+          â† Voltar
         </Link>
       </div>
     </div>

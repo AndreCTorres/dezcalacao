@@ -1,8 +1,8 @@
 'use client'
 
 // app/app/example-round-checker.tsx
-// Exemplo de integração do MemberRoundChecker em modal
-// Use como referência para adicionar à sua home
+// Exemplo de integraÃ§Ã£o do MemberRoundChecker em modal
+// Use como referÃªncia para adicionar Ã  sua home
 
 import { useState } from 'react'
 import { MemberRoundChecker, type MemberRoundData } from './member-round-checker'
@@ -13,7 +13,7 @@ export function ExampleRoundChecker() {
   // Dados de exemplo (substitua com dados reais do seu sistema)
   const exampleData: MemberRoundData = {
     memberId: 'member-123',
-    memberName: 'André',
+    memberName: 'AndrÃ©',
     round: 1,
     starters: [
       {
@@ -39,7 +39,7 @@ export function ExampleRoundChecker() {
         player_id: 3,
         slot: 'starter',
         position_slot: 'ZAG',
-        rating: null, // ⚠️ SEM NOTA
+        rating: null, // âš ï¸ SEM NOTA
         minutes: 0,
         players: { id: 3, name: 'Gabriel Magalhaes', team_name: 'Arsenal', position: 'D' },
       },
@@ -49,7 +49,7 @@ export function ExampleRoundChecker() {
         slot: 'starter',
         position_slot: 'LAT',
         rating: 6.8,
-        minutes: 45, // ⏱️ < 20 min
+        minutes: 45, // poucos minutos, mas a nota conta
         players: { id: 4, name: 'Danilo Junior', team_name: 'Brasil', position: 'D' },
       },
       {
@@ -68,7 +68,7 @@ export function ExampleRoundChecker() {
         position_slot: 'MEI',
         rating: 8.1,
         minutes: 90,
-        players: { id: 6, name: 'Vinícius Jr', team_name: 'Brasil', position: 'M' },
+        players: { id: 6, name: 'VinÃ­cius Jr', team_name: 'Brasil', position: 'M' },
       },
       {
         id: 's7',
@@ -86,7 +86,7 @@ export function ExampleRoundChecker() {
         position_slot: 'MEI',
         rating: 7.3,
         minutes: 90,
-        players: { id: 8, name: 'Lucas Paquetá', team_name: 'Brasil', position: 'M' },
+        players: { id: 8, name: 'Lucas PaquetÃ¡', team_name: 'Brasil', position: 'M' },
       },
       {
         id: 's9',
@@ -173,19 +173,19 @@ export function ExampleRoundChecker() {
 
   return (
     <div className="space-y-4">
-      {/* Botão para abrir checker */}
+      {/* BotÃ£o para abrir checker */}
       <button
         onClick={() => setShowChecker(!showChecker)}
         className="w-full py-3 px-4 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-bold rounded-lg transition flex items-center justify-center gap-2"
       >
-        🔍 {showChecker ? 'Fechar Conferência' : 'Conferir Ratings - Rodada 1'}
+        ðŸ” {showChecker ? 'Fechar ConferÃªncia' : 'Conferir Ratings - Rodada 1'}
       </button>
 
       {/* Modal com o checker */}
       {showChecker && (
         <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-gray-900 rounded-xl border border-white/20 max-w-2xl w-full my-8">
-            {/* Conteúdo do modal */}
+            {/* ConteÃºdo do modal */}
             <div className="p-6 max-h-[90vh] overflow-y-auto">
               <MemberRoundChecker data={exampleData} onClose={() => setShowChecker(false)} />
             </div>
@@ -197,19 +197,19 @@ export function ExampleRoundChecker() {
       {!showChecker && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4 space-y-2">
-            <p className="text-xs font-bold text-green-400 uppercase">✅ Com Notas</p>
+            <p className="text-xs font-bold text-green-400 uppercase">âœ… Com Notas</p>
             <p className="text-xl font-bold text-green-400">9/11</p>
             <p className="text-xs text-green-300">titulares com ratings</p>
           </div>
 
           <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-4 space-y-2">
-            <p className="text-xs font-bold text-orange-400 uppercase">⚠️ Alertas</p>
+            <p className="text-xs font-bold text-orange-400 uppercase">âš ï¸ Alertas</p>
             <p className="text-xl font-bold text-orange-400">2</p>
-            <p className="text-xs text-orange-300">faltam notas • 4 subs não usadas</p>
+            <p className="text-xs text-orange-300">faltam notas â€¢ 4 subs nÃ£o usadas</p>
           </div>
 
           <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 space-y-2">
-            <p className="text-xs font-bold text-blue-400 uppercase">📊 Total</p>
+            <p className="text-xs font-bold text-blue-400 uppercase">ðŸ“Š Total</p>
             <p className="text-xl font-bold text-blue-400">67.05</p>
             <p className="text-xs text-blue-300">pts (82% cobertura)</p>
           </div>

@@ -1,4 +1,4 @@
-# 🧪 Guia de Testes - Dezcalação
+# ðŸ§ª Guia de Testes - DezcalaÃ§Ã£o
 
 ## Overview
 
@@ -6,19 +6,19 @@ Projeto usa **Playwright** para E2E e **Playwright Test** para unit tests.
 
 ```
 tests/
-├── e2e/
-│   ├── scoring.spec.ts     # Fluxo de pontuação
-│   ├── substitutions.spec.ts # Fluxo de substituições
-│   └── ranking.spec.ts     # Fluxo de ranking
-└── unit/
-    └── scoring.test.ts     # Lógica pura de scoring
+â”œâ”€â”€ e2e/
+â”‚   â”œâ”€â”€ scoring.spec.ts     # Fluxo de pontuaÃ§Ã£o
+â”‚   â”œâ”€â”€ substitutions.spec.ts # Fluxo de substituiÃ§Ãµes
+â”‚   â””â”€â”€ ranking.spec.ts     # Fluxo de ranking
+â””â”€â”€ unit/
+    â””â”€â”€ scoring.test.ts     # LÃ³gica pura de scoring
 ```
 
 ---
 
-## 🚀 Quick Start
+## ðŸš€ Quick Start
 
-### Instalação
+### InstalaÃ§Ã£o
 ```bash
 npm install
 ```
@@ -50,17 +50,17 @@ npm run test:debug
 
 ---
 
-## 📝 Testes E2E
+## ðŸ“ Testes E2E
 
-### `scoring.spec.ts` - Fluxo de Pontuação
+### `scoring.spec.ts` - Fluxo de PontuaÃ§Ã£o
 
 **O que testa:**
 - Admin fecha rodada
-- Ratings são sincronizados (API-Football)
+- Ratings sÃ£o sincronizados (API-Football)
 - Scores aparecem para participantes
 - Ranking atualiza
 
-**Pré-requisitos:**
+**PrÃ©-requisitos:**
 - Grupo com 2+ participantes criado
 - Draft realizado
 - Rodada aberta
@@ -72,21 +72,21 @@ npm run test:e2e -- scoring
 
 ---
 
-### `substitutions.spec.ts` - Fluxo de Substituições
+### `substitutions.spec.ts` - Fluxo de SubstituiÃ§Ãµes
 
 **O que testa:**
-- Participante faz substituição
-- Validações são aplicadas
-- Botão de reverter funciona
-- Limite de subs é respeitado
-- Validação de posição
+- Participante faz substituiÃ§Ã£o
+- ValidaÃ§Ãµes sÃ£o aplicadas
+- BotÃ£o de reverter funciona
+- Limite de subs Ã© respeitado
+- ValidaÃ§Ã£o de posiÃ§Ã£o
 
 **Casos cobertos:**
-1. ✅ Fazer uma substituição válida
-2. ✅ Navegar via botão da home
-3. ✅ Respeitar limite
-4. ✅ Reverter substituição
-5. ✅ Não substituir com posição diferente
+1. âœ… Fazer uma substituiÃ§Ã£o vÃ¡lida
+2. âœ… Navegar via botÃ£o da home
+3. âœ… Respeitar limite
+4. âœ… Reverter substituiÃ§Ã£o
+5. âœ… NÃ£o substituir com posiÃ§Ã£o diferente
 
 **Executar:**
 ```bash
@@ -99,19 +99,19 @@ npm run test:e2e -- substitutions
 
 **O que testa:**
 - Medalhas aparecem para top 3
-- Usuário atual destacado em verde
+- UsuÃ¡rio atual destacado em verde
 - Pontos totais exibidos
-- Último score de cada rodada
+- Ãšltimo score de cada rodada
 - Acordeom de rodadas funciona
-- Atualização automática 30s
+- AtualizaÃ§Ã£o automÃ¡tica 30s
 
 **Casos cobertos:**
-1. ✅ Medalhas (🥇🥈🥉)
-2. ✅ Destaque do usuário atual
-3. ✅ Exibição de pontos
-4. ✅ Último score
-5. ✅ Acordeom por rodada
-6. ✅ Indicador de carregamento
+1. âœ… Medalhas (ðŸ¥‡ðŸ¥ˆðŸ¥‰)
+2. âœ… Destaque do usuÃ¡rio atual
+3. âœ… ExibiÃ§Ã£o de pontos
+4. âœ… Ãšltimo score
+5. âœ… Acordeom por rodada
+6. âœ… Indicador de carregamento
 
 **Executar:**
 ```bash
@@ -120,32 +120,32 @@ npm run test:e2e -- ranking
 
 ---
 
-## 🔬 Testes Unitários
+## ðŸ”¬ Testes UnitÃ¡rios
 
-### `scoring.test.ts` - Lógica Pura de Scoring
+### `scoring.test.ts` - LÃ³gica Pura de Scoring
 
-**Funções testadas:**
-- `effectiveRating()` - Retorna rating com validações
+**FunÃ§Ãµes testadas:**
+- `effectiveRating()` - Retorna rating com validaÃ§Ãµes
 - `basePoints()` - Soma pontos dos 11 titulares
 - `selecaoDaRodada()` - Retorna XI da rodada
 
 **Casos cobertos:**
 
 #### effectiveRating()
-- ✅ Rating quando >= minMinutos
-- ✅ Retorna 0 quando < minMinutos
-- ✅ Retorna neutralRating quando null
-- ✅ Retorna 0 quando não jogou
+- âœ… Rating quando >= minMinutos
+- âœ… Retorna 0 quando < minMinutos
+- âœ… Retorna neutralRating quando null
+- âœ… Retorna 0 quando nÃ£o jogou
 
 #### basePoints()
-- ✅ Soma correta de 11 titulares
-- ✅ Ignora reservas
-- ✅ Retorna 0 quando sem ratings
+- âœ… Soma correta de 11 titulares
+- âœ… Ignora reservas
+- âœ… Retorna 0 quando sem ratings
 
 #### selecaoDaRodada()
-- ✅ Retorna XI (1 GK, 2 ZAG, 2 LAT, 3 MEI, 3 ATK)
-- ✅ Ignora < 20 minutos
-- ✅ Ignora rating null
+- âœ… Retorna XI (1 GK, 2 ZAG, 2 LAT, 3 MEI, 3 ATK)
+- ? Conta notas independentemente dos minutos
+- âœ… Ignora rating null
 
 **Executar:**
 ```bash
@@ -154,7 +154,7 @@ npm run test:unit
 
 ---
 
-## 📊 Estrutura de um Teste E2E
+## ðŸ“Š Estrutura de um Teste E2E
 
 ```typescript
 test.describe('Feature Name', () => {
@@ -163,11 +163,11 @@ test.describe('Feature Name', () => {
     await page.goto('/login')
   })
 
-  test('descrição do que testa', async ({ page }) => {
-    // 1. Ação
+  test('descriÃ§Ã£o do que testa', async ({ page }) => {
+    // 1. AÃ§Ã£o
     await page.click('button:has-text("Click me")')
 
-    // 2. Verificação
+    // 2. VerificaÃ§Ã£o
     await expect(page.locator('text=Success')).toBeVisible()
   })
 })
@@ -175,7 +175,7 @@ test.describe('Feature Name', () => {
 
 ---
 
-## 🏃 Rodar Localmente
+## ðŸƒ Rodar Localmente
 
 ### Setup do Banco de Teste
 
@@ -193,7 +193,7 @@ supabase sql \
    VALUES ("group-id", "user-id", "Test User", "joined")'
 
 # 3. Criar draft de teste (16 jogadores)
-# Use script: supabase/seed-test-team.sql (criar se necessário)
+# Use script: supabase/seed-test-team.sql (criar se necessÃ¡rio)
 
 # 4. Criar rodada aberta
 supabase sql \
@@ -213,19 +213,19 @@ npm test
 
 ---
 
-## 🐛 Debugging
+## ðŸ› Debugging
 
-### Ver vídeo de teste
+### Ver vÃ­deo de teste
 ```bash
 npx playwright show-trace trace.zip
 ```
 
-### Rodas em headless=false (vê browser)
+### Rodas em headless=false (vÃª browser)
 ```bash
 npm run test:debug
 ```
 
-### Pausar em ponto específico
+### Pausar em ponto especÃ­fico
 ```typescript
 test('meu teste', async ({ page }) => {
   await page.pause() // Pausa aqui
@@ -240,25 +240,25 @@ page.on('console', msg => console.log(msg.text()))
 
 ---
 
-## 📋 Checklist Antes de Commit
+## ðŸ“‹ Checklist Antes de Commit
 
 - [ ] `npm test` passa sem erros
 - [ ] `npm run build` sem warnings
 - [ ] `npm run lint` sem issues
 - [ ] Novos testes para features novas
 - [ ] Testes removidos se feature removida
-- [ ] Sem `test.only()` no código
+- [ ] Sem `test.only()` no cÃ³digo
 
 ---
 
-## 🔗 Referências
+## ðŸ”— ReferÃªncias
 
 - [Playwright Docs](https://playwright.dev)
 - [Testing Library](https://testing-library.com)
-- [Configuração](../playwright.config.ts)
+- [ConfiguraÃ§Ã£o](../playwright.config.ts)
 - [Tests E2E](../tests/e2e)
 - [Tests Unit](../tests/unit)
 
 ---
 
-**Última atualização:** Junho 2026
+**Ãšltima atualizaÃ§Ã£o:** Junho 2026

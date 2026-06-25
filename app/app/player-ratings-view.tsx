@@ -75,7 +75,7 @@ export function PlayerRatingsView({ groupId, memberId }: PlayerRatingsViewProps)
   if (loading) {
     return (
       <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700 text-gray-400 text-sm">
-        ⏳ Carregando notas...
+        â³ Carregando notas...
       </div>
     )
   }
@@ -85,7 +85,7 @@ export function PlayerRatingsView({ groupId, memberId }: PlayerRatingsViewProps)
   if (roundsWithRatings.length === 0) {
     return (
       <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700 text-gray-400 text-sm text-center">
-        Nenhuma nota disponível ainda. As notas aparecem após o admin inserir os dados dos jogos.
+        Nenhuma nota disponÃ­vel ainda. As notas aparecem apÃ³s o admin inserir os dados dos jogos.
       </div>
     )
   }
@@ -105,7 +105,7 @@ export function PlayerRatingsView({ groupId, memberId }: PlayerRatingsViewProps)
             key={round.roundId}
             className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden"
           >
-            {/* Header clicável */}
+            {/* Header clicÃ¡vel */}
             <button
               onClick={() => setExpanded(isExpanded ? null : round.roundId)}
               className="w-full px-4 py-3 flex justify-between items-center hover:bg-gray-700/40 transition"
@@ -117,7 +117,7 @@ export function PlayerRatingsView({ groupId, memberId }: PlayerRatingsViewProps)
                     ? 'bg-yellow-500/20 text-yellow-400'
                     : 'bg-lime-500/20 text-lime-400'
                 }`}>
-                  {round.status === 'scored' ? '✅ Pontuada' : '🟢 Aberta'}
+                  {round.status === 'scored' ? 'âœ… Pontuada' : 'ðŸŸ¢ Aberta'}
                 </span>
               </div>
               <div className="flex items-center gap-3">
@@ -126,11 +126,11 @@ export function PlayerRatingsView({ groupId, memberId }: PlayerRatingsViewProps)
                     {total.toFixed(2)} pts
                   </span>
                 )}
-                <span className="text-gray-400 text-sm">{isExpanded ? '−' : '+'}</span>
+                <span className="text-gray-400 text-sm">{isExpanded ? 'âˆ’' : '+'}</span>
               </div>
             </button>
 
-            {/* Conteúdo expandido */}
+            {/* ConteÃºdo expandido */}
             {isExpanded && (
               <div className="border-t border-gray-700 bg-gray-900/30 px-4 py-3 space-y-4">
 
@@ -158,7 +158,7 @@ export function PlayerRatingsView({ groupId, memberId }: PlayerRatingsViewProps)
                             <span className={`text-xs font-bold px-2 py-0.5 rounded w-10 text-center shrink-0 ${
                               !pontua ? 'bg-gray-700 text-gray-500' : ratingColor(p.rating)
                             }`}>
-                              {p.rating !== null ? p.rating.toFixed(1) : '–'}
+                              {p.rating !== null ? p.rating.toFixed(1) : 'â€“'}
                             </span>
                           </div>
                         )
@@ -184,12 +184,12 @@ export function PlayerRatingsView({ groupId, memberId }: PlayerRatingsViewProps)
                             <span className="text-gray-600 text-xs ml-1">({p.teamName})</span>
                           </span>
                           <span className="text-xs text-gray-600 shrink-0">
-                            {p.minutes > 0 ? `${p.minutes}min` : '–'}
+                            {p.minutes > 0 ? `${p.minutes}min` : 'â€“'}
                           </span>
                           <span className={`text-xs font-bold px-2 py-0.5 rounded w-10 text-center shrink-0 ${
                             p.rating !== null ? ratingColor(p.rating) : 'bg-gray-700 text-gray-600'
                           }`}>
-                            {p.rating !== null ? p.rating.toFixed(1) : '–'}
+                            {p.rating !== null ? p.rating.toFixed(1) : 'â€“'}
                           </span>
                         </div>
                       ))}
@@ -200,7 +200,7 @@ export function PlayerRatingsView({ groupId, memberId }: PlayerRatingsViewProps)
                 {/* Total */}
                 {total > 0 && (
                   <div className="pt-2 border-t border-gray-700/50 flex justify-between items-center">
-                    <span className="text-xs text-gray-400">Total (titulares com ≥20min)</span>
+                    <span className="text-xs text-gray-400">Total (titulares com nota)</span>
                     <span className="text-lime-400 font-bold">{total.toFixed(2)} pts</span>
                   </div>
                 )}

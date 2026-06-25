@@ -67,7 +67,7 @@ describe('Scoring Logic', () => {
   })
 
   describe('selecaoDaRodada()', () => {
-    it('escolhe os melhores por posicao independentemente dos minutos', () => {
+    it('escolhe os melhores por posicao usando apenas a nota', () => {
       const players: PlayerRating[] = [
         { playerId: 1, teamId: 1, position: 'GK', rating: 8.0, minutes: 90 },
         { playerId: 2, teamId: 1, position: 'GK', rating: 9.0, minutes: 1 },
@@ -88,6 +88,18 @@ describe('Scoring Logic', () => {
       expect(result.size).toBe(11)
       expect(result.has(2)).toBe(true)
       expect(result.has(1)).toBe(false)
+    })
+
+    it('preserva a ordem original quando as notas empatam', () => {
+      const players: PlayerRating[] = [
+        { playerId: 1, teamId: 1, position: 'GK', rating: 8.0, minutes: 1 },
+        { playerId: 2, teamId: 1, position: 'GK', rating: 8.0, minutes: 90 },
+      ]
+
+      const result = selecaoDaRodada(players)
+
+      expect(result.has(1)).toBe(true)
+      expect(result.has(2)).toBe(false)
     })
 
     it('ignora jogadores com rating null', () => {

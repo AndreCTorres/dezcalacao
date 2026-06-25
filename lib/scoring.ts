@@ -65,7 +65,7 @@ export function selecaoDaRodada(all: PlayerRating[]): Set<number> {
   ;(Object.keys(want) as Position[]).forEach((position) => {
     const pool = all
       .filter((player) => player.position === position && player.rating != null)
-      .sort((a, b) => b.rating! - a.rating! || b.minutes - a.minutes)
+      .sort((a, b) => b.rating! - a.rating!)
 
     pool.slice(0, want[position]).forEach((player) => chosen.add(player.playerId))
   })
@@ -79,7 +79,7 @@ export function craquesDaRodada(byFixture: Map<number, PlayerRating[]>): Set<num
   byFixture.forEach((players) => {
     const top = players
       .filter((player) => player.rating != null)
-      .sort((a, b) => b.rating! - a.rating! || b.minutes - a.minutes)[0]
+      .sort((a, b) => b.rating! - a.rating!)[0]
 
     if (top) chosen.add(top.playerId)
   })
@@ -139,7 +139,7 @@ export interface TeamOfTheRound<T extends RatedForTotr> {
 
 export function pickTeamOfRound<T extends RatedForTotr>(players: T[]): TeamOfTheRound<T> {
   const eligible = players.filter((player) => player.rating != null)
-  const sortByRating = (a: T, b: T) => b.rating! - a.rating! || b.minutes - a.minutes
+  const sortByRating = (a: T, b: T) => b.rating! - a.rating!
   const lines = {} as Record<TotrLine, T[]>
   const starters: T[] = []
 

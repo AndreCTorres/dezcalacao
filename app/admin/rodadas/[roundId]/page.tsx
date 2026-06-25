@@ -1,5 +1,5 @@
 // app/admin/rodadas/[roundId]/page.tsx
-// Página de gerenciamento de notas de uma rodada — jogos clicáveis com modal
+// PÃ¡gina de gerenciamento de notas de uma rodada â€” jogos clicÃ¡veis com modal
 
 import { createActionClient, supabaseAdmin } from '@/lib/supabase-server'
 import { redirect, notFound } from 'next/navigation'
@@ -69,7 +69,7 @@ export default async function RoundRatingsPage({ params }: PageProps) {
     .order('sort_order', { ascending: true, nullsFirst: false })
     .order('id', { ascending: true })
 
-  // Para cada fixture, contar quantos jogadores têm nota
+  // Para cada fixture, contar quantos jogadores tÃªm nota
   const allFixtureIds = (allFixtures ?? []).map((f: any) => f.id)
   const { data: ratingCounts } = allFixtureIds.length > 0
     ? await admin
@@ -130,16 +130,16 @@ export default async function RoundRatingsPage({ params }: PageProps) {
     .select('team_name')
     .order('team_name', { ascending: true })
 
-  // Nomes exatamente como cadastrados em players.team_name (inglês/oficial)
-  // Estes são os únicos valores válidos — o datalist guia o admin para não digitar em português
+  // Nomes exatamente como cadastrados em players.team_name (inglÃªs/oficial)
+  // Estes sÃ£o os Ãºnicos valores vÃ¡lidos â€” o datalist guia o admin para nÃ£o digitar em portuguÃªs
   const WORLD_CUP_TEAM_OPTIONS = [
     'Algeria', 'Argentina', 'Australia', 'Austria', 'Belgium', 'Bosnia & Herzegovina',
     'Brazil', 'Canada', 'Cape Verde Islands', 'Colombia', 'Congo DR', 'Croatia',
-    'Curaçao', 'Czech Republic', 'Ecuador', 'Egypt', 'England', 'France', 'Germany',
+    'CuraÃ§ao', 'Czech Republic', 'Ecuador', 'Egypt', 'England', 'France', 'Germany',
     'Ghana', 'Haiti', 'Iraq', 'Ivory Coast', 'Japan', 'Jordan', 'Mexico', 'Morocco',
     'Netherlands', 'New Zealand', 'Norway', 'Panama', 'Paraguay', 'Portugal',
     'Qatar', 'Saudi Arabia', 'Scotland', 'Senegal', 'South Africa', 'South Korea',
-    'Spain', 'Sweden', 'Switzerland', 'Tunisia', 'Türkiye', 'Uruguay', 'USA', 'Uzbekistan',
+    'Spain', 'Sweden', 'Switzerland', 'Tunisia', 'TÃ¼rkiye', 'Uruguay', 'USA', 'Uzbekistan',
   ]
 
   const teamOptions = Array.from(
@@ -158,7 +158,7 @@ export default async function RoundRatingsPage({ params }: PageProps) {
         <div className="mb-8">
           <div className="flex justify-between items-start mb-4">
             <Link href="/admin/rodadas" className="text-lime-400 hover:text-lime-300 text-sm">
-              ← Voltar para rodadas
+              â† Voltar para rodadas
             </Link>
             <LogoutButton />
           </div>
@@ -172,7 +172,7 @@ export default async function RoundRatingsPage({ params }: PageProps) {
               round.status === 'open'   ? 'bg-lime-500/20 text-lime-400' :
                                          'bg-gray-500/20 text-gray-400'
             }`}>
-              {round.status === 'scored' ? '✅ Pontuada' : round.status === 'open' ? '🟢 Aberta' : '🔒 Travada'}
+              {round.status === 'scored' ? 'âœ… Pontuada' : round.status === 'open' ? 'ðŸŸ¢ Aberta' : 'ðŸ”’ Travada'}
             </span>
             {hasFinalizationColumn && (
               <RoundFinalizationToggle roundId={roundId} finalizedAt={(round as any).finalized_at ?? null} />
@@ -187,7 +187,7 @@ export default async function RoundRatingsPage({ params }: PageProps) {
           </div>
         </div>
 
-        {/* Manager — lista de jogos + modal */}
+        {/* Manager â€” lista de jogos + modal */}
         <RoundRatingsManager
           groupId={groupId}
           roundId={roundId}
@@ -206,9 +206,9 @@ export default async function RoundRatingsPage({ params }: PageProps) {
         <div className="mt-8 p-4 bg-gray-800/50 rounded-lg border border-gray-700 text-xs text-gray-500 space-y-1">
           <p className="font-semibold text-gray-400 text-sm mb-2">Como funciona:</p>
           <p>1. Clique em um jogo para ver e editar as notas dos jogadores</p>
-          <p>2. Use "Recalcular Pontuação" após inserir todas as notas da rodada</p>
-          <p>3. Jogadores com menos de 20 minutos recebem nota 0 no cálculo</p>
-          <p>4. Os participantes verão as notas na seção "⭐ Notas dos Jogadores"</p>
+          <p>2. Use "Recalcular PontuaÃ§Ã£o" apÃ³s inserir todas as notas da rodada</p>
+          <p>3. Minutos são registrados apenas para conferência; a nota conta integralmente</p>
+          <p>4. Os participantes verÃ£o as notas na seÃ§Ã£o "â­ Notas dos Jogadores"</p>
         </div>
       </div>
     </div>

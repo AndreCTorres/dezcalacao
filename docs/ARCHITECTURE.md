@@ -1,50 +1,50 @@
-# Dezcalação — Arquitetura do Projeto
+# DezcalaÃ§Ã£o â€” Arquitetura do Projeto
 
-> Documento de referência técnica. Descreve fluxo de autenticação, entidades, regras de negócio, dependências e estrutura do projeto.
+> Documento de referÃªncia tÃ©cnica. Descreve fluxo de autenticaÃ§Ã£o, entidades, regras de negÃ³cio, dependÃªncias e estrutura do projeto.
 
-## 1. Fluxo de Autenticação
+## 1. Fluxo de AutenticaÃ§Ã£o
 
-### Visão Geral
-- **Tipo:** Link mágico (magic link) por e-mail + Google OAuth (opcional)
+### VisÃ£o Geral
+- **Tipo:** Link mÃ¡gico (magic link) por e-mail + Google OAuth (opcional)
 - **Provedor:** Supabase Auth
-- **Sessão:** Baseada em cookies (via `@supabase/ssr`)
-- **Proteção:** Middleware Next.js valida sessão em cada requisição
+- **SessÃ£o:** Baseada em cookies (via `@supabase/ssr`)
+- **ProteÃ§Ã£o:** Middleware Next.js valida sessÃ£o em cada requisiÃ§Ã£o
 
 ### Fluxo Detalhado
 
 ```
-1. Usuário acessa /login
-   ↓
-2. Form envia e-mail → server action (app/login/actions.ts)
-   ↓
-3. Supabase envia link mágico por e-mail
-   ↓
-4. Usuário clica link → rota /auth/callback ou /auth/confirm
-   ↓
-5. Callback/Confirm resgata token, cria sessão via cookie
-   ↓
+1. UsuÃ¡rio acessa /login
+   â†“
+2. Form envia e-mail â†’ server action (app/login/actions.ts)
+   â†“
+3. Supabase envia link mÃ¡gico por e-mail
+   â†“
+4. UsuÃ¡rio clica link â†’ rota /auth/callback ou /auth/confirm
+   â†“
+5. Callback/Confirm resgata token, cria sessÃ£o via cookie
+   â†“
 6. Middleware refresh token automaticamente (getUser())
-   ↓
-7. Usuário é redirecionado para /admin ou /app
+   â†“
+7. UsuÃ¡rio Ã© redirecionado para /admin ou /app
 ```
 
 ### Arquivos Relevantes
-- `app/login/page.tsx` — página de login
-- `app/login/login-form.tsx` — form de e-mail
-- `app/login/actions.ts` — server action que envia link
-- `app/auth/callback/route.ts` — rota de callback (PKCE)
-- `app/auth/confirm/route.ts` — rota de callback (stateless)
-- `middleware.ts` — refresh de sessão e proteção de rotas
-- `lib/supabase-server.ts` — clientes com SSR (cookies)
+- `app/login/page.tsx` â€” pÃ¡gina de login
+- `app/login/login-form.tsx` â€” form de e-mail
+- `app/login/actions.ts` â€” server action que envia link
+- `app/auth/callback/route.ts` â€” rota de callback (PKCE)
+- `app/auth/confirm/route.ts` â€” rota de callback (stateless)
+- `middleware.ts` â€” refresh de sessÃ£o e proteÃ§Ã£o de rotas
+- `lib/supabase-server.ts` â€” clientes com SSR (cookies)
 
-### Detalhes de Implementação
-- **Cliente anon:** Usa `NEXT_PUBLIC_SUPABASE_ANON_KEY` (pública, segura)
+### Detalhes de ImplementaÃ§Ã£o
+- **Cliente anon:** Usa `NEXT_PUBLIC_SUPABASE_ANON_KEY` (pÃºblica, segura)
 - **Cookies:** Armazenam `sb-access-token` e `sb-refresh-token`
-- **Refresh automático:** Middleware chama `getUser()` que atualiza token se necessário
-- **Proteção de rotas:**
-  - `/admin` e `/app` requerem autenticação
-  - Se não autenticado → redireciona para `/login`
-  - Se autenticado em `/login` → redireciona para `/admin`
+- **Refresh automÃ¡tico:** Middleware chama `getUser()` que atualiza token se necessÃ¡rio
+- **ProteÃ§Ã£o de rotas:**
+  - `/admin` e `/app` requerem autenticaÃ§Ã£o
+  - Se nÃ£o autenticado â†’ redireciona para `/login`
+  - Se autenticado em `/login` â†’ redireciona para `/admin`
 
 ---
 
@@ -53,7 +53,7 @@
 ### Schema Completo (Supabase / Postgres)
 
 #### `profiles`
-Espelho de `auth.users`. Cada usuário autenticado tem um perfil.
+Espelho de `auth.users`. Cada usuÃ¡rio autenticado tem um perfil.
 
 ```sql
 CREATE TABLE profiles (
@@ -63,15 +63,15 @@ CREATE TABLE profiles (
 );
 ```
 
-**Chave primária:** `id` (UUID, gerada pelo Auth do Supabase)  
+**Chave primÃ¡ria:** `id` (UUID, gerada pelo Auth do Supabase)  
 **Campos:**
-- `display_name` — nome do usuário (exibição)
-- `created_at` — data de criação
+- `display_name` â€” nome do usuÃ¡rio (exibiÃ§Ã£o)
+- `created_at` â€” data de criaÃ§Ã£o
 
 ---
 
 #### `groups`
-Representa um bolão/grupo de amigos.
+Representa um bolÃ£o/grupo de amigos.
 
 ```sql
 CREATE TABLE groups (
@@ -89,16 +89,16 @@ CREATE TABLE groups (
 ```
 
 **Estados (`status`):**
-- `setup` — configurando o grupo
-- `drafting` — em andamento o draft
-- `active` — torneio ativo (draft fechado)
-- `finished` — torneio encerrado
+- `setup` â€” configurando o grupo
+- `drafting` â€” em andamento o draft
+- `active` â€” torneio ativo (draft fechado)
+- `finished` â€” torneio encerrado
 
-**Regras configuráveis por grupo:**
-- `bonus_selecao_rodada` — ativar bônus XI da rodada
-- `bonus_craque_partida` — ativar bônus craque dos jogos
-- `max_subs_por_rodada` — limite de substituições por rodada (padrão: 3)
-- `min_minutos` — minutos mínimos para pontuação (padrão: 20)
+**Regras configurÃ¡veis por grupo:**
+- `bonus_selecao_rodada` â€” ativar bÃ´nus XI da rodada
+- `bonus_craque_partida` â€” ativar bÃ´nus craque dos jogos
+- `max_subs_por_rodada` â€” limite de substituiÃ§Ãµes por rodada (padrÃ£o: 3)
+- `min_minutos` - legado/configuração antiga; minutos não filtram pontuação no motor atual
 
 ---
 
@@ -120,17 +120,17 @@ CREATE TABLE group_members (
 ```
 
 **Roles:**
-- `player` — participante normal
-- `admin` — criador/administrador do grupo
+- `player` â€” participante normal
+- `admin` â€” criador/administrador do grupo
 
 **Estados (`status`):**
-- `invited` — convidado, ainda sem conta
-- `joined` — aceitou e tem conta
+- `invited` â€” convidado, ainda sem conta
+- `joined` â€” aceitou e tem conta
 
 ---
 
 #### `teams` (cache da API)
-Cache de seleções/times da Copa 2026.
+Cache de seleÃ§Ãµes/times da Copa 2026.
 
 ```sql
 CREATE TABLE teams (
@@ -167,12 +167,12 @@ CREATE TABLE players (
 );
 ```
 
-**Posições (`position`):**
-- `GK` — goleiro
-- `ZAG` — zagueiro
-- `LAT` — lateral
-- `MEI` — meio-campo
-- `ATK` — ataque
+**PosiÃ§Ãµes (`position`):**
+- `GK` â€” goleiro
+- `ZAG` â€” zagueiro
+- `LAT` â€” lateral
+- `MEI` â€” meio-campo
+- `ATK` â€” ataque
 
 ---
 
@@ -192,8 +192,8 @@ CREATE TABLE team_players (
 ```
 
 **Slots:**
-- `starter` — 11 titulares
-- `bench` — 5 reservas
+- `starter` â€” 11 titulares
+- `bench` â€” 5 reservas
 
 ---
 
@@ -213,9 +213,9 @@ CREATE TABLE rounds (
 ```
 
 **Estados (`status`):**
-- `open` — rodada aberta, pode fazer substituições
-- `locked` — rodada travada, aguardando resultados
-- `scored` — pontuação calculada
+- `open` â€” rodada aberta, pode fazer substituiÃ§Ãµes
+- `locked` â€” rodada travada, aguardando resultados
+- `scored` â€” pontuaÃ§Ã£o calculada
 
 ---
 
@@ -239,7 +239,7 @@ CREATE TABLE player_round_ratings (
 ---
 
 #### `substitutions`
-Trocas de reserva por titular (mesma posição, por rodada).
+Trocas de reserva por titular (mesma posiÃ§Ã£o, por rodada).
 
 ```sql
 CREATE TABLE substitutions (
@@ -256,7 +256,7 @@ CREATE TABLE substitutions (
 ---
 
 #### `round_scores`
-Pontuação calculada por membro por rodada.
+PontuaÃ§Ã£o calculada por membro por rodada.
 
 ```sql
 CREATE TABLE round_scores (
@@ -273,38 +273,38 @@ CREATE TABLE round_scores (
 
 ---
 
-## 3. Regras de Negócio
+## 3. Regras de NegÃ³cio
 
 ### Regras do Jogo
 
-#### Composição do Time
+#### ComposiÃ§Ã£o do Time
 - **16 jogadores:** 11 titulares + 5 reservas
-- **Um por seleção:** não pode ter 2 jogadores do mesmo país no mesmo time
-- **Por posição:** validar conforme requerimento específico
+- **Um por seleÃ§Ã£o:** nÃ£o pode ter 2 jogadores do mesmo paÃ­s no mesmo time
+- **Por posiÃ§Ã£o:** validar conforme requerimento especÃ­fico
 
-#### Pontuação
-**Base (obrigatória):**
+#### PontuaÃ§Ã£o
+**Base (obrigatÃ³ria):**
 1. Soma das notas dos 11 titulares naquela rodada
-2. Nota vem da API-Football (escala ~0–10)
-3. Se jogador jogou menos de `min_minutos` (padrão: 20 min) → nota 0
-4. Se seleção não jogou ou foi eliminada → nota 0
-5. Se nota ainda não saiu → usar `neutralRating` (padrão: 6.0) temporariamente
+2. Nota vem da API-Football (escala ~0â€“10)
+3. Minutos não filtram pontuação; se o jogador tem nota, ela conta integralmente
+4. Se seleÃ§Ã£o nÃ£o jogou ou foi eliminada â†’ nota 0
+5. Se nota ainda nÃ£o saiu â†’ usar `neutralRating` (padrÃ£o: 6.0) temporariamente
 
-**Bônus (opcionais, por grupo):**
-- **XI da Rodada:** +1.0 ponto por jogador no XI determinístico (maior nota por posição)
+**BÃ´nus (opcionais, por grupo):**
+- **XI da Rodada:** +1.0 ponto por jogador no XI determinÃ­stico (maior nota por posiÃ§Ã£o)
 - **Craque da Partida:** +1.0 ponto por jogador com maior nota em seu jogo
 
-#### Substituições
-- **Limite:** até `max_subs_por_rodada` (padrão: 3) por rodada, por membro
-- **Regra:** reserva entra no lugar de titular, **mesma posição**
-- **Janela:** após rodada travar (ou limite de tempo)
-- **Contabilização:** score recalculado com nova escalação
+#### SubstituiÃ§Ãµes
+- **Limite:** atÃ© `max_subs_por_rodada` (padrÃ£o: 3) por rodada, por membro
+- **Regra:** reserva entra no lugar de titular, **mesma posiÃ§Ã£o**
+- **Janela:** apÃ³s rodada travar (ou limite de tempo)
+- **ContabilizaÃ§Ã£o:** score recalculado com nova escalaÃ§Ã£o
 
 ---
 
-## 4. Dependências Entre Módulos
+## 4. DependÃªncias Entre MÃ³dulos
 
-### Dependências Externas (package.json)
+### DependÃªncias Externas (package.json)
 
 ```json
 {
@@ -320,26 +320,26 @@ CREATE TABLE round_scores (
 ### Fluxo de Dados
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│ NAVEGADOR                                               │
-├─────────────────────────────────────────────────────────┤
-│ • Server Components (RSC)                               │
-│ • Client Components (form, interação)                   │
-└─────────────────┬─────────────────────────────────────┬─┘
-                  │                                       │
-         ┌────────▼────────┐                   ┌─────────▼──────┐
-         │ Server Actions  │                   │ API Routes     │
-         │ (lib/supabase)  │                   │ (/api/...)     │
-         └────────┬────────┘                   └─────────┬──────┘
-                  │                                       │
-                  └─────────────┬──────────────────────────┘
-                                │
-                        ┌───────▼────────┐
-                        │ Supabase       │
-                        │ • Auth         │
-                        │ • Postgres DB  │
-                        │ • RLS Policies │
-                        └────────────────┘
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚ NAVEGADOR                                               â”‚
+â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+â”‚ â€¢ Server Components (RSC)                               â”‚
+â”‚ â€¢ Client Components (form, interaÃ§Ã£o)                   â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”˜
+                  â”‚                                       â”‚
+         â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â–¼â”€â”€â”€â”€â”€â”€â”€â”€â”                   â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â–¼â”€â”€â”€â”€â”€â”€â”
+         â”‚ Server Actions  â”‚                   â”‚ API Routes     â”‚
+         â”‚ (lib/supabase)  â”‚                   â”‚ (/api/...)     â”‚
+         â””â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”˜                   â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”˜
+                  â”‚                                       â”‚
+                  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+                                â”‚
+                        â”Œâ”€â”€â”€â”€â”€â”€â”€â–¼â”€â”€â”€â”€â”€â”€â”€â”€â”
+                        â”‚ Supabase       â”‚
+                        â”‚ â€¢ Auth         â”‚
+                        â”‚ â€¢ Postgres DB  â”‚
+                        â”‚ â€¢ RLS Policies â”‚
+                        â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
 ```
 
 ---
@@ -348,60 +348,60 @@ CREATE TABLE round_scores (
 
 ```
 dezcalacao/
-├── app/                           # Rotas Next.js (App Router)
-│   ├── layout.tsx                 # Root layout
-│   ├── page.tsx                   # Landing (/)
-│   ├── admin/                     # Painel do admin
-│   ├── app/                       # Painel do participante
-│   ├── login/                     # Autenticação
-│   ├── auth/                      # Callbacks de auth
-│   ├── api/                       # API routes
-│   ├── components/                # Componentes compartilhados
-│   └── globals.css                # Estilos globais
-│
-├── lib/                           # Utilitários e clientes
-│   ├── supabase.ts                # Clientes Supabase
-│   ├── supabase-server.ts         # Clientes SSR
-│   ├── apiFootball.ts             # Cliente API-Football
-│   └── scoring.ts                 # Motor de pontuação
-│
-├── supabase/                      # Scripts e SQL
-│   ├── schema.sql                 # Schema completo
-│   ├── rls-policies.sql           # Políticas de segurança
-│   └── migration-teams-sync.sql   # Migrations
-│
-├── docs/                          # 📁 NOVA: Documentação
-│   ├── README.md                  # Índice de docs
-│   ├── BRIEF.md                   # Spec do produto
-│   ├── ARCHITECTURE.md            # Arquitetura técnica
-│   ├── SETUP_LOGIN.md             # Setup de autenticação
-│   ├── CONFIGURAR_SUPABASE.md     # Config do Supabase
-│   ├── CONFIGURAR_EMAIL_TEMPLATE.md # Config de e-mail
-│   ├── GUIA-tela1-grupo.md        # Guia de desenvolvimento
-│   ├── FLUXO_STATELESS_PRONTO.md  # Fluxo de auth
-│   └── SYNC_JOGADORES.md          # Sincronização de jogadores
-│
-├── middleware.ts                  # Middleware Next.js
-├── tsconfig.json                  # Config TypeScript
-├── package.json                   # Dependências
-├── .env.example                   # Template de env
-├── .cursorrules                   # Convenções (Cursor AI)
-├── .gitignore                     # Git ignore
-└── README.md                      # Setup rápido
+â”œâ”€â”€ app/                           # Rotas Next.js (App Router)
+â”‚   â”œâ”€â”€ layout.tsx                 # Root layout
+â”‚   â”œâ”€â”€ page.tsx                   # Landing (/)
+â”‚   â”œâ”€â”€ admin/                     # Painel do admin
+â”‚   â”œâ”€â”€ app/                       # Painel do participante
+â”‚   â”œâ”€â”€ login/                     # AutenticaÃ§Ã£o
+â”‚   â”œâ”€â”€ auth/                      # Callbacks de auth
+â”‚   â”œâ”€â”€ api/                       # API routes
+â”‚   â”œâ”€â”€ components/                # Componentes compartilhados
+â”‚   â””â”€â”€ globals.css                # Estilos globais
+â”‚
+â”œâ”€â”€ lib/                           # UtilitÃ¡rios e clientes
+â”‚   â”œâ”€â”€ supabase.ts                # Clientes Supabase
+â”‚   â”œâ”€â”€ supabase-server.ts         # Clientes SSR
+â”‚   â”œâ”€â”€ apiFootball.ts             # Cliente API-Football
+â”‚   â””â”€â”€ scoring.ts                 # Motor de pontuaÃ§Ã£o
+â”‚
+â”œâ”€â”€ supabase/                      # Scripts e SQL
+â”‚   â”œâ”€â”€ schema.sql                 # Schema completo
+â”‚   â”œâ”€â”€ rls-policies.sql           # PolÃ­ticas de seguranÃ§a
+â”‚   â””â”€â”€ migration-teams-sync.sql   # Migrations
+â”‚
+â”œâ”€â”€ docs/                          # ðŸ“ NOVA: DocumentaÃ§Ã£o
+â”‚   â”œâ”€â”€ README.md                  # Ãndice de docs
+â”‚   â”œâ”€â”€ BRIEF.md                   # Spec do produto
+â”‚   â”œâ”€â”€ ARCHITECTURE.md            # Arquitetura tÃ©cnica
+â”‚   â”œâ”€â”€ SETUP_LOGIN.md             # Setup de autenticaÃ§Ã£o
+â”‚   â”œâ”€â”€ CONFIGURAR_SUPABASE.md     # Config do Supabase
+â”‚   â”œâ”€â”€ CONFIGURAR_EMAIL_TEMPLATE.md # Config de e-mail
+â”‚   â”œâ”€â”€ GUIA-tela1-grupo.md        # Guia de desenvolvimento
+â”‚   â”œâ”€â”€ FLUXO_STATELESS_PRONTO.md  # Fluxo de auth
+â”‚   â””â”€â”€ SYNC_JOGADORES.md          # SincronizaÃ§Ã£o de jogadores
+â”‚
+â”œâ”€â”€ middleware.ts                  # Middleware Next.js
+â”œâ”€â”€ tsconfig.json                  # Config TypeScript
+â”œâ”€â”€ package.json                   # DependÃªncias
+â”œâ”€â”€ .env.example                   # Template de env
+â”œâ”€â”€ .cursorrules                   # ConvenÃ§Ãµes (Cursor AI)
+â”œâ”€â”€ .gitignore                     # Git ignore
+â””â”€â”€ README.md                      # Setup rÃ¡pido
 ```
 
 ---
 
-## 6. Próximos Passos
+## 6. PrÃ³ximos Passos
 
-1. ✅ **Arquitetura documentada** em `ARCHITECTURE.md`
-2. ✅ **Documentação agrupada** em `/docs`
-3. 📋 **Implementar tela de admin** (criar grupo, draft)
-4. 📋 **Sincronizar jogadores** (API-Football)
-5. 📋 **Implementar pontuação** (closing rodadas)
-6. 📋 **UI do participante** (ver time + substituições)
+1. âœ… **Arquitetura documentada** em `ARCHITECTURE.md`
+2. âœ… **DocumentaÃ§Ã£o agrupada** em `/docs`
+3. ðŸ“‹ **Implementar tela de admin** (criar grupo, draft)
+4. ðŸ“‹ **Sincronizar jogadores** (API-Football)
+5. ðŸ“‹ **Implementar pontuaÃ§Ã£o** (closing rodadas)
+6. ðŸ“‹ **UI do participante** (ver time + substituiÃ§Ãµes)
 
 ---
 
-**Última atualização:** Junho 2026  
-**Versão:** 1.0
+**Ãšltima atualizaÃ§Ã£o:** Junho 2026  
+**VersÃ£o:** 1.0

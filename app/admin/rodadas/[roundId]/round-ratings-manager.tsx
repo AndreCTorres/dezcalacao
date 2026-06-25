@@ -108,7 +108,7 @@ function parseManualBulkInput(text: string) {
 
   if (!trimmed) {
     return {
-      entries: [] as Array<{ name: string; team?: string; rating: number; minutes: number }>,
+      entries: [] as Array<{ name: string; team?: string; rating: number; minutes: number; lineupRole?: 'starter' | 'substitute' | null }>,
       unmatched: [] as string[],
       teamHints: [] as string[],
     }
@@ -133,8 +133,9 @@ function parseManualBulkInput(text: string) {
         .map((item: any) => ({
           name: String(item?.name ?? '').trim(),
           team: String(item?.team ?? item?.team_name ?? '').trim(),
-          rating: Number(item?.rating),
-          minutes: Number(item?.minutes ?? 90),
+          rating: item?.rating === null || item?.rating === undefined ? null : Number(item.rating),
+          lineupRole: normalizeLineupRole(item?.lineupRole ?? item?.lineup_role ?? item?.role),
+          minutes: Number(item?.minutes ?? minutesFromLineupRole(item?.lineupRole ?? item?.lineup_role ?? item?.role)),
         }))
         .filter((item: any) => item.name && Number.isFinite(item.rating))
 
@@ -144,7 +145,7 @@ function parseManualBulkInput(text: string) {
     }
   }
 
-  const entries: Array<{ name: string; team?: string; rating: number; minutes: number }> = []
+  const entries: Array<{ name: string; team?: string; rating: number; minutes: number; lineupRole?: 'starter' | 'substitute' | null }> = []
   const unmatched: string[] = []
 
   for (const line of trimmed.split(/\r?\n/)) {
@@ -162,6 +163,20 @@ function parseManualBulkInput(text: string) {
   }
 
   return { entries, unmatched, teamHints: [] as string[] }
+}
+
+function normalizeLineupRole(value: unknown): 'starter' | 'substitute' | null {
+  const normalized = String(value ?? '').trim().toLowerCase().replace(/[^a-z]/g, '')
+  if (['starter', 'starting', 'titular', 'xi'].includes(normalized)) return 'starter'
+  if (['substitute', 'sub', 'bench', 'reserva'].includes(normalized)) return 'substitute'
+  return null
+}
+
+function minutesFromLineupRole(value: unknown) {
+  const role = normalizeLineupRole(value)
+  if (role === 'starter') return 90
+  if (role === 'substitute') return 1
+  return 0
 }
 
 type ManualEntry = ReturnType<typeof parseManualBulkInput>['entries'][number]
@@ -489,7 +504,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
     // Salvar placar se fornecido
     if (fixtureScore.home_goals.trim() !== '' || fixtureScore.away_goals.trim() !== '') {
       if ((homeGoals !== null && !Number.isFinite(homeGoals)) || (awayGoals !== null && !Number.isFinite(awayGoals))) {
-        setFeedback({ type: 'error', msg: 'Placar deve conter números válidos.' })
+        setFeedback({ type: 'error', msg: 'Placar deve conter nÃºmeros vÃ¡lidos.' })
         setSavingFixture(false)
         return
       }
@@ -592,6 +607,12 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
           ? String(parsed.minutes)
           : (nextRatings[player.id]?.minutes || '90'),
       }
+      if (parsed.lineupRole === 'starter' || parsed.lineupRole === 'substitute') {
+        setLineupOverrides(prev => ({
+          ...prev,
+          [player.id]: parsed.lineupRole!,
+        }))
+      }
       matched++
     }
 
@@ -615,10 +636,34 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
         .replace(/\s+/g, ' ')
         .trim()
       
-      // Mapeamento hardcoded de correções comuns para hints detectados do JSON
+      // Mapeamento hardcoded de correÃ§Ãµes comuns para hints detectados do JSON
       const corrections: Record<string, string> = {
+        'bosnia and herzegovina': 'Bosnia & Herzegovina',
+        'bosnia herzegovina': 'Bosnia & Herzegovina',
+        'united states': 'USA',
+        'estados unidos': 'USA',
+        eua: 'USA',
+        'cote d ivoire': 'Ivory Coast',
+        'cote divoire': 'Ivory Coast',
+        'costa do marfim': 'Ivory Coast',
+        'congo dr': 'Congo DR',
+        'dr congo': 'Congo DR',
+        'democratic republic of the congo': 'Congo DR',
+        'rd congo': 'Congo DR',
         'cape verde': 'Cape Verde Islands',
         'capeverde': 'Cape Verde Islands',
+        'cabo verde': 'Cape Verde Islands',
+        turkiye: 'Türkiye',
+        turkey: 'Türkiye',
+        turquia: 'Türkiye',
+        'czechia': 'Czech Republic',
+        'czech republic': 'Czech Republic',
+        'rep tcheca': 'Czech Republic',
+        'republica tcheca': 'Czech Republic',
+        'south korea': 'South Korea',
+        'korea republic': 'South Korea',
+        'coreia do sul': 'South Korea',
+        curacao: 'Curaçao',
       }
       
       const corrected = corrections[normalized]
@@ -664,7 +709,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
 
   function applyManualSuggestion(sourceName: string, suggestion: ManualSuggestion) {
     const confirmed = window.confirm(
-      `Trocar "${sourceName}" por "${suggestion.name}"?\n${suggestion.position} · ${suggestion.team || 'sem time'}`
+      `Trocar "${sourceName}" por "${suggestion.name}"?\n${suggestion.position} Â· ${suggestion.team || 'sem time'}`
     )
     if (!confirmed) return
 
@@ -918,12 +963,12 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
       )}
 
       {fixtureList.length > 0 && isSavingOrder && (
-        <div className="p-2 text-xs text-blue-400 text-center">💾 Salvando ordem...</div>
+        <div className="p-2 text-xs text-blue-400 text-center">ðŸ’¾ Salvando ordem...</div>
       )}
 
       {fixtureList.length > 0 && (
         <p className="text-xs text-gray-500 px-1">
-          ⠿ Arraste os jogos para reordenar conforme aconteceram
+          â ¿ Arraste os jogos para reordenar conforme aconteceram
         </p>
       )}
 
@@ -959,7 +1004,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
               </svg>
             </div>
 
-            {/* Card clicável */}
+            {/* Card clicÃ¡vel */}
             <button
               onClick={() => openFixture(fixture)}
               className="flex-1 text-left bg-gray-800 hover:bg-gray-700/80 border border-l-0 border-gray-700 hover:border-lime-500/40 rounded-r-xl p-4 transition group min-w-0"
@@ -1010,7 +1055,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
                     <span>{fixture.home_team} x {fixture.away_team}</span>
                     {kickoffDate && (
                       <span className="text-gray-600">
-                        • {kickoffDate.toLocaleDateString('pt-BR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                        â€¢ {kickoffDate.toLocaleDateString('pt-BR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
                       </span>
                     )}
                   </div>
@@ -1084,7 +1129,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
 
               {!loadingPlayers && players.length > 0 && (
                 <>
-                  {/* Card de resumo (por time) — lado a lado */}
+                  {/* Card de resumo (por time) â€” lado a lado */}
                   <div className="grid grid-cols-2 gap-3">
                     {Object.entries(playersByTeam).map(([teamName, teamPlayers]) => {
                     const lineup = getTeamLineup(teamPlayers)
@@ -1094,7 +1139,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
                     const startersSubbed = lineup.starters.length - startersFull
                     const teamPlayedFull = startersFull
                     const teamPlayedPartial = startersSubbed
-                    // Máximo 11 titulares + 5 subs = 16 por time
+                    // MÃ¡ximo 11 titulares + 5 subs = 16 por time
                     const subsCount = lineup.substitutes.length
                     const hasTooManyPlayers = teamPlayed > 16
                     const hasInvalidLineup = hasTooManyPlayers || lineup.starters.length > 11 || subsCount > 5
@@ -1133,7 +1178,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
                   })}
                   </div>
 
-                  {/* Seção de placar */}
+                  {/* SeÃ§Ã£o de placar */}
                   <div className="bg-gray-800/70 border border-gray-700 rounded-xl p-4">
                     <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Times do jogo</h4>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1213,7 +1258,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
                     <p className="text-xs text-gray-500 mt-2">Opcional: preencha para registrar o placar.</p>
                   </div>
 
-                  {/* Seção de bulk ratings */}
+                  {/* SeÃ§Ã£o de bulk ratings */}
                   <div className="bg-gray-800/70 border border-gray-700 rounded-xl p-3">
                     <textarea
                       value={bulkText}
@@ -1240,7 +1285,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
                         <span className="text-lime-400">{bulkResult.matched} linhas preenchidas</span>
                         {bulkResult.unmatched.length > 0 && (
                           <span className="text-yellow-400">
-                            {' '}· {bulkResult.unmatched.length} sem correspondencia
+                            {' '}Â· {bulkResult.unmatched.length} sem correspondencia
                           </span>
                         )}
                         {bulkResult.unmatched.length > 0 && (
@@ -1303,7 +1348,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
                   <div className="text-center text-gray-400 py-4">
                     <p className="text-base font-semibold text-white mb-2">Nenhum jogador encontrado para este jogo</p>
                     <p className="text-sm text-gray-500">
-                      Você ainda pode preencher as notas manualmente colando as linhas abaixo.
+                      VocÃª ainda pode preencher as notas manualmente colando as linhas abaixo.
                     </p>
                   </div>
 
@@ -1336,7 +1381,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
                         <span className="text-lime-400">{manualBulkResult.matched} linhas preenchidas</span>
                         {manualBulkResult.unmatched.length > 0 && (
                           <span className="text-yellow-400">
-                            {' '}· {manualBulkResult.unmatched.length} sem correspondencia
+                            {' '}Â· {manualBulkResult.unmatched.length} sem correspondencia
                           </span>
                         )}
                         {manualBulkResult.unmatchedDetails && manualBulkResult.unmatchedDetails.length > 0 && (
@@ -1354,7 +1399,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
                                   </button>
                                 </div>
                                 <p className="mt-1 text-[11px] text-yellow-100/70">
-                                  Escolha uma opção antes de substituir.
+                                  Escolha uma opÃ§Ã£o antes de substituir.
                                 </p>
                                 <div className="mt-1 flex flex-wrap gap-2">
                                   {(item.suggestions.length > 0 ? item.suggestions : []).map((suggestion) => (
@@ -1363,9 +1408,9 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
                                       type="button"
                                       onClick={() => applyManualSuggestion(item.name, suggestion)}
                                       className="rounded-full border border-yellow-400/25 bg-black/20 px-2 py-1 text-[11px] text-yellow-100 hover:bg-yellow-400/15 transition text-left"
-                                      title={`${suggestion.position} · ${suggestion.team || 'sem time'} · ${suggestion.name}`}
+                                      title={`${suggestion.position} Â· ${suggestion.team || 'sem time'} Â· ${suggestion.name}`}
                                     >
-                                      {suggestion.position || '--'} · {suggestion.team || 'sem time'} · {suggestion.name}
+                                      {suggestion.position || '--'} Â· {suggestion.team || 'sem time'} Â· {suggestion.name}
                                     </button>
                                   ))}
                                 </div>
@@ -1406,7 +1451,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
               )}
 
               {!loadingPlayers && Object.entries(playersByTeam).map(([teamName, teamPlayers]) => {
-                // Separar em duas listas: quem jogou (minutos > 0) e quem não jogou
+                // Separar em duas listas: quem jogou (minutos > 0) e quem nÃ£o jogou
                 const lineup = getTeamLineup(teamPlayers)
                 const played = lineup.starters
                 const substitutes = lineup.substitutes
@@ -1414,7 +1459,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
                 const notPlayed = lineup.notPlayed
                 /*
                 const notPlayedOld = lineup.notPlayed.sort((a, b) => {
-                  // Ordenar por posição
+                  // Ordenar por posiÃ§Ã£o
                   const posOrder = { GK: 0, ZAG: 1, LAT: 2, MEI: 3, ATK: 4 }
                   const posA = (posOrder as any)[a.position] ?? 99
                   const posB = (posOrder as any)[b.position] ?? 99
@@ -1496,7 +1541,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
                       </div>
                     )}
 
-                    {/* Jogadores que não jogaram (ou entraram) */}
+                    {/* Jogadores que nÃ£o jogaram (ou entraram) */}
                     {substitutes.length > 0 && (
                       <>
                         <p className="text-xs font-semibold text-orange-300 mb-2 px-1">
@@ -1584,7 +1629,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
                                 <option value="not_played">Nao rel.</option>
                               </select>
 
-                              <span className="text-xs text-gray-700 w-12 text-center shrink-0">—</span>
+                              <span className="text-xs text-gray-700 w-12 text-center shrink-0">â€”</span>
 
                               <span className={`text-xs font-bold px-1.5 py-0.5 rounded w-10 text-center shrink-0 ${ratingColor(ratingNum)}`}>
                                 {ratingNum !== null && Number.isFinite(ratingNum) ? ratingNum.toFixed(1) : '-'}

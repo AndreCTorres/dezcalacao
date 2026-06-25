@@ -24,11 +24,11 @@ Responda somente com JSON, sem markdown, sem explicacoes antes ou depois.
     "awayGoals": 1
   },
   "players": [
-    { "name": "M. I. Abunada", "team": "Qatar", "rating": 6.9, "minutes": 90 },
-    { "name": "B. Khoukhi", "team": "Qatar", "rating": 6.4, "minutes": 90 },
-    { "name": "P. Miguel", "team": "Qatar", "rating": 7.4, "minutes": 90 },
-    { "name": "G. Kobel", "team": "Switzerland", "rating": 7.2, "minutes": 90 },
-    { "name": "G. Xhaka", "team": "Switzerland", "rating": 7.2, "minutes": 90 }
+    { "name": "M. I. Abunada", "team": "Qatar", "rating": 6.9, "lineupRole": "starter" },
+    { "name": "B. Khoukhi", "team": "Qatar", "rating": 6.4, "lineupRole": "starter" },
+    { "name": "P. Miguel", "team": "Qatar", "rating": 7.4, "lineupRole": "starter" },
+    { "name": "G. Kobel", "team": "Switzerland", "rating": 7.2, "lineupRole": "starter" },
+    { "name": "G. Xhaka", "team": "Switzerland", "rating": 7.2, "lineupRole": "starter" }
   ]
 }
 ```
@@ -85,12 +85,12 @@ Responda somente com JSON, sem markdown, sem explicacoes antes ou depois.
   - `name`: nome padronizado do jogador.
   - `team`: selecao em ingles.
   - `rating`: nota de 0 a 10, usando ponto decimal.
-  - `minutes`: minutos jogados como numero inteiro.
+  - `lineupRole`: use `"starter"` para jogadores que aparecem no print do campo inicial; use `"substitute"` para reservas que aparecem no print de substitutos que entraram; use `null` somente se nao der para identificar.
 - Ordene os jogadores pelo time mandante primeiro e depois pelo visitante.
 - Em geral, devem existir no maximo 16 jogadores por time: 11 titulares + ate 5 reservas que entraram.
 - Nao inclua jogadores que ficaram no banco e nao entraram.
 - Se a nota nao estiver visivel, use `null`.
-- Se os minutos nao estiverem visiveis, estime pelos dados do print. Se nao houver pista, use `90` para titular e `0` para jogador que nao entrou.
+- Nao estime minutos. A pontuacao usa somente a nota.
 
 ## Validacao antes de responder
 
@@ -102,6 +102,8 @@ Antes de finalizar, confira:
 - Nao ha texto fora do JSON.
 - Nao ha jogadores duplicados.
 - Nao ha mais de 16 jogadores por time.
+- Jogadores do print do campo inicial estao com `lineupRole: "starter"`.
+- Jogadores do print de substitutos que entraram estao com `lineupRole: "substitute"`.
 
 ## Exemplo completo
 
@@ -115,16 +117,16 @@ Antes de finalizar, confira:
     "awayGoals": 1
   },
   "players": [
-    { "name": "M. I. Abunada", "team": "Qatar", "rating": 6.9, "minutes": 90 },
-    { "name": "B. Khoukhi", "team": "Qatar", "rating": 6.4, "minutes": 90 },
-    { "name": "P. Miguel", "team": "Qatar", "rating": 7.4, "minutes": 90 },
-    { "name": "A. Madibo", "team": "Qatar", "rating": 6.3, "minutes": 79 },
-    { "name": "A. Afif", "team": "Qatar", "rating": 7.2, "minutes": 90 },
-    { "name": "G. Kobel", "team": "Switzerland", "rating": 7.2, "minutes": 90 },
-    { "name": "G. Xhaka", "team": "Switzerland", "rating": 7.2, "minutes": 90 },
-    { "name": "B. Embolo", "team": "Switzerland", "rating": 7.0, "minutes": 90 },
-    { "name": "R. Rodriguez", "team": "Switzerland", "rating": 7.6, "minutes": 89 },
-    { "name": "R. Vargas", "team": "Switzerland", "rating": 7.9, "minutes": 79 }
+    { "name": "M. I. Abunada", "team": "Qatar", "rating": 6.9, "lineupRole": "starter" },
+    { "name": "B. Khoukhi", "team": "Qatar", "rating": 6.4, "lineupRole": "starter" },
+    { "name": "P. Miguel", "team": "Qatar", "rating": 7.4, "lineupRole": "starter" },
+    { "name": "A. Madibo", "team": "Qatar", "rating": 6.3, "lineupRole": "starter" },
+    { "name": "A. Afif", "team": "Qatar", "rating": 7.2, "lineupRole": "starter" },
+    { "name": "G. Kobel", "team": "Switzerland", "rating": 7.2, "lineupRole": "starter" },
+    { "name": "G. Xhaka", "team": "Switzerland", "rating": 7.2, "lineupRole": "starter" },
+    { "name": "B. Embolo", "team": "Switzerland", "rating": 7.0, "lineupRole": "starter" },
+    { "name": "R. Rodriguez", "team": "Switzerland", "rating": 7.6, "lineupRole": "starter" },
+    { "name": "R. Vargas", "team": "Switzerland", "rating": 7.9, "lineupRole": "substitute" }
   ]
 }
 ```

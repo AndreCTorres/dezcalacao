@@ -1,6 +1,6 @@
 // app/app/selecao/page.tsx
-// Seleção da Rodada: o XI 4-3-3 com as maiores notas da rodada (todas as notas
-// lançadas, não só as de quem foi draftado) + destaque do craque (maior nota).
+// SeleÃ§Ã£o da Rodada: o XI 4-3-3 com as maiores notas da rodada (todas as notas
+// lanÃ§adas, nÃ£o sÃ³ as de quem foi draftado) + destaque do craque (maior nota).
 
 import { createActionClient, supabaseAdmin } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
@@ -25,7 +25,7 @@ export default async function SelecaoDaRodadaPage({
 
   const admin = supabaseAdmin()
 
-  // 1. Descobrir o grupo do usuário (participante ou admin)
+  // 1. Descobrir o grupo do usuÃ¡rio (participante ou admin)
   const { data: memberships } = await admin
     .from('group_members')
     .select('group_id')
@@ -47,12 +47,12 @@ export default async function SelecaoDaRodadaPage({
   if (!groupId) {
     return (
       <Shell>
-        <Empty title="Você não está em um grupo ainda" subtitle="Aguarde um convite do admin." />
+        <Empty title="VocÃª nÃ£o estÃ¡ em um grupo ainda" subtitle="Aguarde um convite do admin." />
       </Shell>
     )
   }
 
-  // 2. Buscar config do grupo (minutos mínimos) e rodadas
+  // 2. Buscar rodadas do grupo
   const { data: rounds } = await admin
     .from('rounds')
     .select('id, name, status, created_at')
@@ -69,8 +69,8 @@ export default async function SelecaoDaRodadaPage({
     )
   }
 
-  // Rodada atual automática: a mais recente que JÁ tem notas; se nenhuma tiver,
-  // a que está aberta; senão a última criada. (Evita ter que clicar.)
+  // Rodada atual automÃ¡tica: a mais recente que JÃ tem notas; se nenhuma tiver,
+  // a que estÃ¡ aberta; senÃ£o a Ãºltima criada. (Evita ter que clicar.)
   const roundIds = roundList.map((r) => r.id)
   const { data: ratedRows } = await admin
     .from('player_round_ratings')
@@ -87,7 +87,7 @@ export default async function SelecaoDaRodadaPage({
     : defaultRound.id
   const selectedRound = roundList.find((r) => r.id === selectedRoundId)!
 
-  // 3. Buscar notas da rodada + dados dos jogadores (duas queries, junta em memória)
+  // 3. Buscar notas da rodada + dados dos jogadores (duas queries, junta em memÃ³ria)
   const { data: ratings } = await admin
     .from('player_round_ratings')
     .select('player_id, rating, minutes')
@@ -124,7 +124,7 @@ export default async function SelecaoDaRodadaPage({
       .filter((x): x is TotrPlayer & { position: Position } => x !== null)
   }
 
-  // 4. Calcular o XI e o craque (função pura)
+  // 4. Calcular o XI e o craque (funÃ§Ã£o pura)
   const totr = pickTeamOfRound(combined)
   const hasTeam = totr.starters.length > 0
 
@@ -134,21 +134,21 @@ export default async function SelecaoDaRodadaPage({
         {/* Voltar no topo */}
         <div className="mb-3">
           <Link href="/app" className="text-gray-400 text-sm font-semibold hover:text-lime-400 transition">
-            ← Voltar
+            â† Voltar
           </Link>
         </div>
 
-        {/* Cabeçalho */}
+        {/* CabeÃ§alho */}
         <div className="text-center mb-4">
           <h1
             className="text-2xl font-black uppercase tracking-tight"
             style={{ fontFamily: 'Anton, sans-serif' }}
           >
-            <span style={{ color: '#c5f24a' }}>Seleção</span>
+            <span style={{ color: '#c5f24a' }}>SeleÃ§Ã£o</span>
             <span className="text-white"> da Rodada</span>
           </h1>
           <p className="text-gray-400 text-sm mt-1">
-            Os 11 melhores de <strong className="text-white">{selectedRound.name}</strong> · 4-3-3
+            Os 11 melhores de <strong className="text-white">{selectedRound.name}</strong> Â· 4-3-3
           </p>
         </div>
 
@@ -177,14 +177,14 @@ export default async function SelecaoDaRodadaPage({
             {/* Craque da rodada */}
             {totr.best && (
               <div className="mb-4 flex items-center gap-3 rounded-2xl border border-yellow-400/40 bg-yellow-400/10 p-3">
-                <span className="text-2xl">👑</span>
+                <span className="text-2xl">ðŸ‘‘</span>
                 <div className="flex-1 min-w-0">
                   <p className="text-[10px] uppercase tracking-widest text-yellow-400 font-bold">
                     Craque da Rodada
                   </p>
                   <p className="text-white font-bold truncate">
                     {totr.best.name}{' '}
-                    <span className="text-gray-400 font-normal">· {totr.best.team_name}</span>
+                    <span className="text-gray-400 font-normal">Â· {totr.best.team_name}</span>
                   </p>
                 </div>
                 <span className="font-mono font-black text-yellow-400 text-xl">
@@ -196,17 +196,17 @@ export default async function SelecaoDaRodadaPage({
             {/* Campinho */}
             <TeamOfRoundPitch lines={totr.lines} bestPlayerId={totr.best?.player_id ?? null} />
 
-            {/* Aviso de XI incompleto (faltam notas para alguma posição) */}
+            {/* Aviso de XI incompleto (faltam notas para alguma posiÃ§Ã£o) */}
             {totr.starters.length < 11 && (
               <p className="text-center text-gray-500 text-xs mt-3">
-                XI parcial: faltam notas para preencher todas as posições.
+                XI parcial: faltam notas para preencher todas as posiÃ§Ãµes.
               </p>
             )}
           </>
         ) : (
           <Empty
             title="Sem notas nesta rodada ainda"
-            subtitle="Quando o admin lançar as notas, o XI aparece aqui."
+            subtitle="Quando o admin lanÃ§ar as notas, o XI aparece aqui."
           />
         )}
 
@@ -215,10 +215,10 @@ export default async function SelecaoDaRodadaPage({
             href={`/app/notas?round=${selectedRoundId}`}
             className="text-lime-300 text-sm font-semibold hover:underline"
           >
-            📋 Ver as notas de cada jogo
+            ðŸ“‹ Ver as notas de cada jogo
           </Link>
           <Link href="/app" className="text-gray-400 text-sm font-semibold hover:underline">
-            ← Voltar
+            â† Voltar
           </Link>
         </div>
       </div>
@@ -241,7 +241,7 @@ function Empty({ title, subtitle }: { title: string; subtitle: string }) {
       <p className="text-gray-400">{subtitle}</p>
       <div className="mt-6">
         <Link href="/app" className="text-lime-400 text-sm font-semibold hover:underline">
-          ← Voltar
+          â† Voltar
         </Link>
       </div>
     </div>
