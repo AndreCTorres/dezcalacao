@@ -1,5 +1,5 @@
 // app/admin/rodadas/[roundId]/page.tsx
-// PÃ¡gina de gerenciamento de notas de uma rodada â€” jogos clicÃ¡veis com modal
+// PÃƒÆ’Ã‚Â¡gina de gerenciamento de notas de uma rodada ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â jogos clicÃƒÆ’Ã‚Â¡veis com modal
 
 import { createActionClient, supabaseAdmin } from '@/lib/supabase-server'
 import { redirect, notFound } from 'next/navigation'
@@ -9,6 +9,7 @@ import { RoundRatingsManager } from './round-ratings-manager'
 import { RoundFinalizationToggle } from './round-finalization-toggle'
 import { RoundStatusActions } from './round-status-actions'
 import { RatingsAuditViewer } from './ratings-audit-viewer'
+import { canonicalTeamName, normalizeTeamName } from '@/lib/teamNames'
 
 interface PageProps {
   params: Promise<{ roundId: string }>
@@ -47,28 +48,7 @@ export default async function RoundRatingsPage({ params }: PageProps) {
   const groupId = round.group_id
   const groupName = (round.groups as any).name
 
-  const normalizeFixtureTeam = (value: string | null) =>
-    (value ?? '')
-      .replace(/Ã¼/g, 'ü')
-      .replace(/Ãœ/g, 'Ü')
-      .replace(/Ä±/g, 'ı')
-      .replace(/Ä°/g, 'İ')
-      .replace(/ÄŸ/g, 'ğ')
-      .replace(/ÅŸ/g, 'ş')
-      .replace(/Ã§/g, 'ç')
-      .replace(/Ã¶/g, 'ö')
-      .replace(/ı/g, 'i')
-      .replace(/İ/g, 'I')
-      .replace(/ğ/g, 'g')
-      .replace(/Ğ/g, 'G')
-      .replace(/ş/g, 's')
-      .replace(/Ş/g, 'S')
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim()
+  const normalizeFixtureTeam = normalizeTeamName
 
   const fixturePairKey = (fixture: any) =>
     [normalizeFixtureTeam(fixture.home_team), normalizeFixtureTeam(fixture.away_team)]
@@ -83,7 +63,7 @@ export default async function RoundRatingsPage({ params }: PageProps) {
     .order('sort_order', { ascending: true, nullsFirst: false })
     .order('id', { ascending: true })
 
-  // Para cada fixture, contar quantos jogadores tÃªm nota
+  // Para cada fixture, contar quantos jogadores tÃƒÆ’Ã‚Âªm nota
   const allFixtureIds = (allFixtures ?? []).map((f: any) => f.id)
   const { data: ratingCounts } = allFixtureIds.length > 0
     ? await admin
@@ -144,8 +124,8 @@ export default async function RoundRatingsPage({ params }: PageProps) {
     .select('team_name')
     .order('team_name', { ascending: true })
 
-  // Nomes exatamente como cadastrados em players.team_name (inglÃªs/oficial)
-  // Estes sÃ£o os Ãºnicos valores vÃ¡lidos â€” o datalist guia o admin para nÃ£o digitar em portuguÃªs
+  // Nomes exatamente como cadastrados em players.team_name (inglÃƒÆ’Ã‚Âªs/oficial)
+  // Estes sÃƒÆ’Ã‚Â£o os ÃƒÆ’Ã‚Âºnicos valores vÃƒÆ’Ã‚Â¡lidos ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â o datalist guia o admin para nÃƒÆ’Ã‚Â£o digitar em portuguÃƒÆ’Ã‚Âªs
   const WORLD_CUP_TEAM_OPTIONS = [
     'Algeria', 'Argentina', 'Australia', 'Austria', 'Belgium', 'Bosnia & Herzegovina',
     'Brazil', 'Canada', 'Cape Verde Islands', 'Colombia', 'Congo DR', 'Croatia',
@@ -156,12 +136,14 @@ export default async function RoundRatingsPage({ params }: PageProps) {
     'Spain', 'Sweden', 'Switzerland', 'Tunisia', 'Turkey', 'Uruguay', 'USA', 'Uzbekistan',
   ]
 
+  const canonicalTeam = canonicalTeamName
+
   const teamOptions = Array.from(
     new Set([
       ...WORLD_CUP_TEAM_OPTIONS,
       ...(playerTeams ?? []).map((p: any) => p.team_name).filter(Boolean),
       ...(allFixtures ?? []).flatMap((f: any) => [f.home_team, f.away_team]).filter(Boolean),
-    ])
+    ].map(canonicalTeam).filter(Boolean))
   ).sort((a, b) => a.localeCompare(b))
 
   return (
@@ -172,7 +154,7 @@ export default async function RoundRatingsPage({ params }: PageProps) {
         <div className="mb-8">
           <div className="flex justify-between items-start mb-4">
             <Link href="/admin/rodadas" className="text-lime-400 hover:text-lime-300 text-sm">
-              â† Voltar para rodadas
+              ÃƒÂ¢Ã¢â‚¬Â Ã‚Â Voltar para rodadas
             </Link>
             <LogoutButton />
           </div>
@@ -186,7 +168,7 @@ export default async function RoundRatingsPage({ params }: PageProps) {
               round.status === 'open'   ? 'bg-lime-500/20 text-lime-400' :
                                          'bg-gray-500/20 text-gray-400'
             }`}>
-              {round.status === 'scored' ? 'âœ… Pontuada' : round.status === 'open' ? 'ðŸŸ¢ Aberta' : 'ðŸ”’ Travada'}
+              {round.status === 'scored' ? 'ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Pontuada' : round.status === 'open' ? 'ÃƒÂ°Ã…Â¸Ã…Â¸Ã‚Â¢ Aberta' : 'ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ¢â‚¬â„¢ Travada'}
             </span>
             {hasFinalizationColumn && (
               <RoundFinalizationToggle roundId={roundId} finalizedAt={(round as any).finalized_at ?? null} />
@@ -201,7 +183,7 @@ export default async function RoundRatingsPage({ params }: PageProps) {
           </div>
         </div>
 
-        {/* Manager â€” lista de jogos + modal */}
+        {/* Manager ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â lista de jogos + modal */}
         <RoundRatingsManager
           groupId={groupId}
           roundId={roundId}
@@ -220,9 +202,9 @@ export default async function RoundRatingsPage({ params }: PageProps) {
         <div className="mt-8 p-4 bg-gray-800/50 rounded-lg border border-gray-700 text-xs text-gray-500 space-y-1">
           <p className="font-semibold text-gray-400 text-sm mb-2">Como funciona:</p>
           <p>1. Clique em um jogo para ver e editar as notas dos jogadores</p>
-          <p>2. Use "Recalcular PontuaÃ§Ã£o" apÃ³s inserir todas as notas da rodada</p>
-          <p>3. Minutos são registrados apenas para conferência; a nota conta integralmente</p>
-          <p>4. Os participantes verÃ£o as notas na seÃ§Ã£o "â­ Notas dos Jogadores"</p>
+          <p>2. Use "Recalcular PontuaÃƒÆ’Ã‚Â§ÃƒÆ’Ã‚Â£o" apÃƒÆ’Ã‚Â³s inserir todas as notas da rodada</p>
+          <p>3. Minutos sÃƒÂ£o registrados apenas para conferÃƒÂªncia; a nota conta integralmente</p>
+          <p>4. Os participantes verÃƒÆ’Ã‚Â£o as notas na seÃƒÆ’Ã‚Â§ÃƒÆ’Ã‚Â£o "ÃƒÂ¢Ã‚Â­Ã‚Â Notas dos Jogadores"</p>
         </div>
       </div>
     </div>

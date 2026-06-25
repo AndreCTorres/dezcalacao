@@ -1,4 +1,9 @@
 import { createClient } from '@supabase/supabase-js'
+import nextEnv from '@next/env'
+import { WORLD_CUP_2026_COUNTRIES } from './world-cup-teams.mjs'
+
+const { loadEnvConfig } = nextEnv
+loadEnvConfig(process.cwd())
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -10,24 +15,57 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
-const teams = ['Qatar', 'Catar', 'Switzerland', 'Suica', 'Suíça']
-const sampleNames = ['abunada', 'khoukhi', 'miguel', 'madibo', 'afif', 'embolo', 'xhaka', 'kobel']
+const DEFAULT_TEAMS = WORLD_CUP_2026_COUNTRIES
+const DEFAULT_NAMES = [
+  'afif',
+  'embolo',
+  'xhaka',
+  'kobel',
+  'bounou',
+  'bono',
+  'cakir',
+  'guler',
+  'gyokeres',
+  'isak',
+  'lindelof',
+  'elanga',
+  'gakpo',
+  'verbruggen',
+  'cacace',
+  'stamenic',
+  'boxall',
+  'crocombe',
+  'paulsen',
+  'wood',
+  'rufer',
+  'yamal',
+  'pedri',
+  'olmo',
+  'cucurella',
+]
 
-async function countExactTeam(teamName) {
+function argsOrDefault(defaultValues) {
+  const args = process.argv.slice(2).map((arg) => arg.trim()).filter(Boolean)
+  return args.length > 0 ? args : defaultValues
+}
+
+async function countTeam(teamName) {
   const { count, error } = await supabase
     .from('players')
     .select('id', { count: 'exact', head: true })
-    .eq('team_name', teamName)
+    .ilike('team_name', teamName)
 
   if (error) return { teamName, error: error.message, count: null }
   return { teamName, count, error: null }
 }
 
 async function run() {
+  const teams = argsOrDefault(DEFAULT_TEAMS)
+
   console.log('Checando elencos no banco...\n')
 
   for (const team of teams) {
-    const result = await countExactTeam(team)
+    const result = await countTeam(team)
     if (result.error) {
       console.log(`${team}: ERRO - ${result.error}`)
     } else {
@@ -36,7 +74,7 @@ async function run() {
   }
 
   console.log('\nBusca ampla por nomes esperados:')
-  for (const name of sampleNames) {
+  for (const name of DEFAULT_NAMES) {
     const { data, error } = await supabase
       .from('players')
       .select('id, name, team_name, position')

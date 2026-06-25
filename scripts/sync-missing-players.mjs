@@ -1,8 +1,14 @@
 import { createClient } from '@supabase/supabase-js'
+import nextEnv from '@next/env'
+import { API_COUNTRY_QUERY, WORLD_CUP_2026_COUNTRIES, canonicalTeam } from './world-cup-teams.mjs'
+
+const { loadEnvConfig } = nextEnv
+loadEnvConfig(process.cwd())
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
 const API_FOOTBALL_KEY = process.env.API_FOOTBALL_KEY
+
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !API_FOOTBALL_KEY) {
   console.error('Faltam NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY e/ou API_FOOTBALL_KEY')
   process.exit(1)
@@ -10,18 +16,36 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !API_FOOTBALL_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
-const THROTTLE_DELAY_MS = 6500 // 10 req/min max = 6.5s cada
+const THROTTLE_DELAY_MS = 6500
 const API_BASE = 'https://v3.football.api-sports.io'
 const SEASON = 'WC2026'
 
-// Times que faltam jogadores (conforme sync-check)
-// ID 20 = Qatar, 22 = Switzerland, 1569 = Curacao, 1568 = Turkey
-const TEAMS_TO_SYNC = [
-  { id: 20, country: 'Qatar' },
-  { id: 22, country: 'Switzerland' },
-  { id: 1569, country: 'Curaçao' },
-  { id: 1568, country: 'Turkey' },
-]
+const COUNTRY_ALIASES = new Map([
+  ['Curaçao', 'Curacao'],
+  ['Turkiye', 'Turkey'],
+  ['Türkiye', 'Turkey'],
+  ['Holland', 'Netherlands'],
+  ['Nova Zelandia', 'New Zealand'],
+  ['Nueva Zelanda', 'New Zealand'],
+  ['Espanha', 'Spain'],
+  ['Egito', 'Egypt'],
+])
+
+const KNOWN_TEAMS = {
+  'South Korea': { id: 17, name: 'South Korea', country: 'South Korea' },
+  'USA': { id: 2384, name: 'USA', country: 'USA' },
+}
+
+function countriesFromArgs() {
+  const args = process.argv
+    .slice(2)
+    .map((arg) => arg.trim())
+    .filter((arg) => arg && arg !== '--all')
+
+  if (args.length === 0 || process.argv.includes('--all')) return WORLD_CUP_2026_COUNTRIES
+
+  return args.map((country) => COUNTRY_ALIASES.get(country) ?? canonicalTeam(country))
+}
 
 function mapPosition(apiPosition) {
   switch ((apiPosition || '').toLowerCase()) {
@@ -39,7 +63,7 @@ function mapPosition(apiPosition) {
 }
 
 function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms))
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 async function apiFootballGet(endpoint, params = {}) {
@@ -66,75 +90,155 @@ async function apiFootballGet(endpoint, params = {}) {
   return json.response || []
 }
 
-async function run() {
-  console.log('🚀 Sincronizando jogadores dos 4 times que faltam...\n')
+function pickNationalTeam(country, teams) {
+  const normalizedCountry = country.toLowerCase()
+  const isSeniorMen = (name) => !/\b(w|u\d{2}|u\d{2}\s*w)\b/i.test(String(name ?? ''))
 
-  let totalPlayersInserted = 0
-  let errors = []
+  return teams.find(({ team }) =>
+    team?.national === true &&
+    isSeniorMen(team?.name) &&
+    String(team?.name ?? '').toLowerCase() === normalizedCountry
+  ) ?? teams.find(({ team }) =>
+    team?.national === true &&
+    isSeniorMen(team?.name) &&
+    String(team?.country ?? '').toLowerCase() === normalizedCountry
+  ) ?? teams.find(({ team }) =>
+    team?.national === true &&
+    isSeniorMen(team?.name) &&
+    String(team?.name ?? '').toLowerCase() === normalizedCountry
+  ) ?? teams.find(({ team }) => team?.national === true && isSeniorMen(team?.name))
+}
 
-  for (const { id: teamId, country } of TEAMS_TO_SYNC) {
-    console.log(`📍 Sincronizando ${country} (ID: ${teamId})...`)
+async function findTeam(country) {
+  if (KNOWN_TEAMS[country]) return KNOWN_TEAMS[country]
 
-    try {
+  const queries = API_COUNTRY_QUERY[country] ?? [country]
+
+  for (const query of queries) {
+    const countryTeams = await apiFootballGet('/teams', { country: query })
+    let match = pickNationalTeam(query, countryTeams)
+
+    if (!match?.team?.id) {
       await sleep(THROTTLE_DELAY_MS)
-      const squadData = await apiFootballGet('/players/squads', { team: teamId })
+      const searchTeams = await apiFootballGet('/teams', { search: query })
+      match = pickNationalTeam(query, searchTeams)
+    }
 
-      if (squadData.length === 0) {
-        console.log(`⚠️  Nenhum squad retornado para ${country}`)
-        continue
+    if (match?.team?.id) {
+      return {
+        id: match.team.id,
+        name: canonicalTeam(match.team.name || country),
+        country,
       }
-
-      const squad = squadData[0]
-      const players = squad.players || []
-      const teamName = squad.team?.name || country
-
-      console.log(`  ${players.length} jogadores encontrados`)
-
-      for (const player of players) {
-        const playerData = {
-          id: player.id,
-          name: player.name,
-          team_id: teamId,
-          team_name: teamName,
-          position: mapPosition(player.position),
-          api_position: player.position,
-          age: player.age || null,
-          number: player.number || null,
-          photo_url: player.photo || null,
-          api_player_id: player.id,
-          season: SEASON,
-          synced_at: new Date().toISOString(),
-        }
-
-        const { error } = await supabase
-          .from('players')
-          .upsert(playerData, { onConflict: 'id' })
-
-        if (error) {
-          errors.push(`${player.name}: ${error.message}`)
-        } else {
-          totalPlayersInserted++
-        }
-      }
-
-      console.log(`  ✓ ${country} sincronizado (${players.length} jogadores)`)
-    } catch (err) {
-      console.error(`  ❌ Erro ao sincronizar ${country}: ${err.message}`)
-      errors.push(`${country}: ${err.message}`)
     }
   }
 
-  console.log(`\n✅ Concluído!`)
-  console.log(`  • Jogadores inseridos: ${totalPlayersInserted}`)
-  if (errors.length > 0) {
-    console.log(`  • Erros: ${errors.length}`)
-    errors.slice(0, 5).forEach(e => console.log(`    - ${e}`))
-  }
-
-  process.exit(0)
+  throw new Error(`Nao encontrei selecao nacional para "${country}"`)
 }
 
-run().catch(err => {
-  console.error('❌ Erro fatal:', err.message)
+async function upsertTeam(team) {
+  const { error } = await supabase
+    .from('teams')
+    .upsert({
+      id: team.id,
+      name: team.name,
+      country: team.country,
+      api_name: team.name,
+      national: true,
+      season: SEASON,
+      synced_at: new Date().toISOString(),
+    }, { onConflict: 'id' })
+
+  if (error) throw new Error(`Erro ao salvar time ${team.name}: ${error.message}`)
+}
+
+async function syncPlayers(team) {
+  if (team.name === 'New Zealand') {
+    await removeKnownBadNewZealandRows()
+  }
+
+  const squadData = await apiFootballGet('/players/squads', { team: team.id })
+
+  if (squadData.length === 0) {
+    console.log(`  Nenhum squad retornado para ${team.name}`)
+    return 0
+  }
+
+  const squad = squadData[0]
+  const players = squad.players || []
+  const teamName = canonicalTeam(squad.team?.name || team.name)
+
+  console.log(`  ${players.length} jogadores encontrados`)
+
+  let saved = 0
+  for (const player of players) {
+    const { error } = await supabase
+      .from('players')
+      .upsert({
+        id: player.id,
+        name: player.name,
+        team_id: team.id,
+        team_name: teamName,
+        position: mapPosition(player.position),
+        api_position: player.position,
+        age: player.age || null,
+        number: player.number || null,
+        photo_url: player.photo || null,
+        api_player_id: player.id,
+        season: SEASON,
+        synced_at: new Date().toISOString(),
+      }, { onConflict: 'id' })
+
+    if (error) {
+      console.log(`  Erro ao salvar ${player.name}: ${error.message}`)
+      continue
+    }
+
+    saved++
+  }
+
+  return saved
+}
+
+async function removeKnownBadNewZealandRows() {
+  const badIds = [999001, 999002, 999003, 999004]
+  const { error } = await supabase
+    .from('players')
+    .delete()
+    .in('id', badIds)
+
+  if (error) {
+    console.log(`  Aviso: nao consegui remover cadastros manuais antigos da Nova Zelandia: ${error.message}`)
+  }
+}
+
+async function run() {
+  const countries = countriesFromArgs()
+  let totalPlayersSaved = 0
+
+  console.log(`Sincronizando elencos (${countries.length} selecoes): ${countries.join(', ')}\n`)
+
+  for (const country of countries) {
+    try {
+      console.log(`Buscando ${country}...`)
+      await sleep(THROTTLE_DELAY_MS)
+      const team = await findTeam(country)
+      await upsertTeam(team)
+
+      await sleep(THROTTLE_DELAY_MS)
+      const saved = await syncPlayers(team)
+      totalPlayersSaved += saved
+
+      console.log(`  OK: ${team.name} (${saved} jogadores salvos)\n`)
+    } catch (error) {
+      console.log(`  Erro em ${country}: ${error.message}\n`)
+    }
+  }
+
+  console.log(`Concluido. Jogadores salvos/atualizados: ${totalPlayersSaved}`)
+}
+
+run().catch((error) => {
+  console.error('Erro fatal:', error.message)
   process.exit(1)
 })

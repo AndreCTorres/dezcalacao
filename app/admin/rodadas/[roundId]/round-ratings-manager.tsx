@@ -5,6 +5,7 @@
 
 import { useState, useTransition } from 'react'
 import { createManualFixture, upsertBatchRatings, upsertManualRatingsByName, recalculateRound, updateFixtureScore, updateFixtureTeams, updatePlayerPositionForRound, reorderFixtures } from './actions'
+import { canonicalTeamHint, canonicalTeamName, teamsMatch } from '@/lib/teamNames'
 
 type Fixture = {
   id: number
@@ -67,20 +68,21 @@ function hasPartialFixtureScore(fixture: Fixture) {
 
 function normalizeText(value: string) {
   return value
-    .replace(/Ã¼/g, 'ü')
-    .replace(/Ãœ/g, 'Ü')
-    .replace(/Ä±/g, 'ı')
-    .replace(/Ä°/g, 'İ')
-    .replace(/ÄŸ/g, 'ğ')
-    .replace(/ÅŸ/g, 'ş')
-    .replace(/Ã§/g, 'ç')
-    .replace(/Ã¶/g, 'ö')
-    .replace(/ı/g, 'i')
-    .replace(/İ/g, 'I')
-    .replace(/ğ/g, 'g')
-    .replace(/Ğ/g, 'G')
-    .replace(/ş/g, 's')
-    .replace(/Ş/g, 'S')
+    .replace(/T\S*rkiye/gi, 'Turkiye')
+    .replace(/ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¼/g, 'ÃƒÆ’Ã‚Â¼')
+    .replace(/ÃƒÆ’Ã†â€™Ãƒâ€¦Ã¢â‚¬Å“/g, 'ÃƒÆ’Ã…â€œ')
+    .replace(/ÃƒÆ’Ã¢â‚¬Å¾Ãƒâ€šÃ‚Â±/g, 'Ãƒâ€žÃ‚Â±')
+    .replace(/ÃƒÆ’Ã¢â‚¬Å¾Ãƒâ€šÃ‚Â°/g, 'Ãƒâ€žÃ‚Â°')
+    .replace(/ÃƒÆ’Ã¢â‚¬Å¾Ãƒâ€¦Ã‚Â¸/g, 'Ãƒâ€žÃ…Â¸')
+    .replace(/ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€¦Ã‚Â¸/g, 'Ãƒâ€¦Ã…Â¸')
+    .replace(/ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â§/g, 'ÃƒÆ’Ã‚Â§')
+    .replace(/ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¶/g, 'ÃƒÆ’Ã‚Â¶')
+    .replace(/Ãƒâ€žÃ‚Â±/g, 'i')
+    .replace(/Ãƒâ€žÃ‚Â°/g, 'I')
+    .replace(/Ãƒâ€žÃ…Â¸/g, 'g')
+    .replace(/Ãƒâ€žÃ…Â¾/g, 'G')
+    .replace(/Ãƒâ€¦Ã…Â¸/g, 's')
+    .replace(/Ãƒâ€¦Ã…Â¾/g, 'S')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
@@ -90,16 +92,7 @@ function normalizeText(value: string) {
 }
 
 function fixDisplayText(value: string | null | undefined) {
-  return String(value ?? '')
-    .replace(/TÃ¼rkiye/g, 'Türkiye')
-    .replace(/Ã¼/g, 'ü')
-    .replace(/Ãœ/g, 'Ü')
-    .replace(/Ä±/g, 'ı')
-    .replace(/Ä°/g, 'İ')
-    .replace(/ÄŸ/g, 'ğ')
-    .replace(/ÅŸ/g, 'ş')
-    .replace(/Ã§/g, 'ç')
-    .replace(/Ã¶/g, 'ö')
+  return canonicalTeamName(value) || String(value ?? '')
 }
 
 function parseRatingLine(line: string) {
@@ -617,7 +610,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
     // Salvar placar se fornecido
     if (fixtureScore.home_goals.trim() !== '' || fixtureScore.away_goals.trim() !== '') {
       if ((homeGoals !== null && !Number.isFinite(homeGoals)) || (awayGoals !== null && !Number.isFinite(awayGoals))) {
-        setFeedback({ type: 'error', msg: 'Placar deve conter nÃºmeros vÃ¡lidos.' })
+        setFeedback({ type: 'error', msg: 'Placar deve conter nÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âºmeros vÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lidos.' })
         setSavingFixture(false)
         return
       }
@@ -704,7 +697,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
       const targetName = normalizeText(parsed.name)
       const player = players.find((candidate) => {
         if (usedPlayerIds.has(candidate.id)) return false
-        if (parsed.team && normalizeText(candidate.team_name) !== normalizeText(parsed.team)) return false
+        if (parsed.team && !teamsMatch(candidate.team_name, parsed.team)) return false
         return hasCompatibleName(parsed.name, candidate.name)
       })
 
@@ -740,62 +733,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
     const { entries, unmatched, teamHints } = parseManualBulkInput(manualBulkText)
     
     // Aplicar aliases aos teamHints detectados do JSON
-    const correctedTeamHints = teamHints.map(hint => {
-      const normalized = hint
-        .replace(/Ã¼/g, 'ü')
-        .replace(/Ãœ/g, 'Ü')
-        .replace(/Ä±/g, 'ı')
-        .replace(/Ä°/g, 'İ')
-        .replace(/ÄŸ/g, 'ğ')
-        .replace(/ÅŸ/g, 'ş')
-        .replace(/Ã§/g, 'ç')
-        .replace(/Ã¶/g, 'ö')
-        .replace(/ı/g, 'i')
-        .replace(/İ/g, 'I')
-        .replace(/ğ/g, 'g')
-        .replace(/Ğ/g, 'G')
-        .replace(/ş/g, 's')
-        .replace(/Ş/g, 'S')
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .toLowerCase()
-        .replace(/[^a-z0-9 ]/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim()
-      
-      // Mapeamento hardcoded de correÃ§Ãµes comuns para hints detectados do JSON
-      const corrections: Record<string, string> = {
-        'bosnia and herzegovina': 'Bosnia & Herzegovina',
-        'bosnia herzegovina': 'Bosnia & Herzegovina',
-        'united states': 'USA',
-        'estados unidos': 'USA',
-        eua: 'USA',
-        'cote d ivoire': 'Ivory Coast',
-        'cote divoire': 'Ivory Coast',
-        'costa do marfim': 'Ivory Coast',
-        'congo dr': 'Congo DR',
-        'dr congo': 'Congo DR',
-        'democratic republic of the congo': 'Congo DR',
-        'rd congo': 'Congo DR',
-        'cape verde': 'Cape Verde Islands',
-        'capeverde': 'Cape Verde Islands',
-        'cabo verde': 'Cape Verde Islands',
-        turkiye: 'Turkey',
-        turkey: 'Turkey',
-        turquia: 'Turkey',
-        'czechia': 'Czech Republic',
-        'czech republic': 'Czech Republic',
-        'rep tcheca': 'Czech Republic',
-        'republica tcheca': 'Czech Republic',
-        'south korea': 'South Korea',
-        'korea republic': 'South Korea',
-        'coreia do sul': 'South Korea',
-        curacao: 'Curacao',
-      }
-      
-      const corrected = corrections[normalized]
-      return corrected || hint
-    })
+    const correctedTeamHints = teamHints.map((hint) => canonicalTeamHint(hint))
     
     const parsedEntries: Array<ManualEntry & { playerId?: number }> = entries.map((entry) => {
       const correction = manualCorrections[correctionKey(entry.name, entry.team)]
@@ -836,7 +774,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
 
   function applyManualSuggestion(sourceName: string, suggestion: ManualSuggestion) {
     const confirmed = window.confirm(
-      `Trocar "${sourceName}" por "${suggestion.name}"?\n${suggestion.position} Â· ${suggestion.team || 'sem time'}`
+      `Trocar "${sourceName}" por "${suggestion.name}"?\n${suggestion.position} ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ${suggestion.team || 'sem time'}`
     )
     if (!confirmed) return
 
@@ -1090,12 +1028,12 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
       )}
 
       {fixtureList.length > 0 && isSavingOrder && (
-        <div className="p-2 text-xs text-blue-400 text-center">ðŸ’¾ Salvando ordem...</div>
+        <div className="p-2 text-xs text-blue-400 text-center">ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢Ãƒâ€šÃ‚Â¾ Salvando ordem...</div>
       )}
 
       {fixtureList.length > 0 && (
         <p className="text-xs text-gray-500 px-1">
-          â ¿ Arraste os jogos para reordenar conforme aconteceram
+          ÃƒÆ’Ã‚Â¢Ãƒâ€šÃ‚Â Ãƒâ€šÃ‚Â¿ Arraste os jogos para reordenar conforme aconteceram
         </p>
       )}
 
@@ -1131,7 +1069,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
               </svg>
             </div>
 
-            {/* Card clicÃ¡vel */}
+            {/* Card clicÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡vel */}
             <button
               onClick={() => openFixture(fixture)}
               className="flex-1 text-left bg-gray-800 hover:bg-gray-700/80 border border-l-0 border-gray-700 hover:border-lime-500/40 rounded-r-xl p-4 transition group min-w-0"
@@ -1182,7 +1120,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
                     <span>{fixDisplayText(fixture.home_team)} x {fixDisplayText(fixture.away_team)}</span>
                     {kickoffDate && (
                       <span className="text-gray-600">
-                        â€¢ {kickoffDate.toLocaleDateString('pt-BR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                        ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ {kickoffDate.toLocaleDateString('pt-BR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
                       </span>
                     )}
                   </div>
@@ -1256,7 +1194,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
 
               {!loadingPlayers && players.length > 0 && (
                 <>
-                  {/* Card de resumo (por time) â€” lado a lado */}
+                  {/* Card de resumo (por time) ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â lado a lado */}
                   <div className="grid grid-cols-2 gap-3">
                     {Object.entries(playersByTeam).map(([teamName, teamPlayers]) => {
                     const lineup = getTeamLineup(teamPlayers)
@@ -1266,7 +1204,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
                     const startersSubbed = lineup.starters.length - startersFull
                     const teamPlayedFull = startersFull
                     const teamPlayedPartial = startersSubbed
-                    // MÃ¡ximo 11 titulares + 5 subs = 16 por time
+                    // MÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡ximo 11 titulares + 5 subs = 16 por time
                     const subsCount = lineup.substitutes.length
                     const hasTooManyPlayers = teamPlayed > 16
                     const hasInvalidLineup = hasTooManyPlayers || lineup.starters.length > 11 || subsCount > 5
@@ -1305,7 +1243,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
                   })}
                   </div>
 
-                  {/* SeÃ§Ã£o de placar */}
+                  {/* SeÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o de placar */}
                   <div className="bg-gray-800/70 border border-gray-700 rounded-xl p-4">
                     <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Times do jogo</h4>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1385,7 +1323,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
                     <p className="text-xs text-gray-500 mt-2">Opcional: preencha para registrar o placar.</p>
                   </div>
 
-                  {/* SeÃ§Ã£o de bulk ratings */}
+                  {/* SeÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o de bulk ratings */}
                   <div className="bg-gray-800/70 border border-gray-700 rounded-xl p-3">
                     <textarea
                       value={bulkText}
@@ -1412,7 +1350,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
                         <span className="text-lime-400">{bulkResult.matched} linhas preenchidas</span>
                         {bulkResult.unmatched.length > 0 && (
                           <span className="text-yellow-400">
-                            {' '}Â· {bulkResult.unmatched.length} sem correspondencia
+                            {' '}ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· {bulkResult.unmatched.length} sem correspondencia
                           </span>
                         )}
                         {bulkResult.unmatched.length > 0 && (
@@ -1475,7 +1413,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
                   <div className="text-center text-gray-400 py-4">
                     <p className="text-base font-semibold text-white mb-2">Nenhum jogador encontrado para este jogo</p>
                     <p className="text-sm text-gray-500">
-                      VocÃª ainda pode preencher as notas manualmente colando as linhas abaixo.
+                      VocÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âª ainda pode preencher as notas manualmente colando as linhas abaixo.
                     </p>
                   </div>
 
@@ -1508,7 +1446,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
                         <span className="text-lime-400">{manualBulkResult.matched} linhas preenchidas</span>
                         {manualBulkResult.unmatched.length > 0 && (
                           <span className="text-yellow-400">
-                            {' '}Â· {manualBulkResult.unmatched.length} sem correspondencia
+                            {' '}ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· {manualBulkResult.unmatched.length} sem correspondencia
                           </span>
                         )}
                         {manualBulkResult.unmatchedDetails && manualBulkResult.unmatchedDetails.length > 0 && (
@@ -1526,7 +1464,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
                                   </button>
                                 </div>
                                 <p className="mt-1 text-[11px] text-yellow-100/70">
-                                  Escolha uma opÃ§Ã£o antes de substituir.
+                                  Escolha uma opÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o antes de substituir.
                                 </p>
                                 <div className="mt-1 flex flex-wrap gap-2">
                                   {(item.suggestions.length > 0 ? item.suggestions : []).map((suggestion) => (
@@ -1535,9 +1473,9 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
                                       type="button"
                                       onClick={() => applyManualSuggestion(item.name, suggestion)}
                                       className="rounded-full border border-yellow-400/25 bg-black/20 px-2 py-1 text-[11px] text-yellow-100 hover:bg-yellow-400/15 transition text-left"
-                                      title={`${suggestion.position} Â· ${suggestion.team || 'sem time'} Â· ${suggestion.name}`}
+                                      title={`${suggestion.position} ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ${suggestion.team || 'sem time'} ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ${suggestion.name}`}
                                     >
-                                      {suggestion.position || '--'} Â· {suggestion.team || 'sem time'} Â· {suggestion.name}
+                                      {suggestion.position || '--'} ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· {suggestion.team || 'sem time'} ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· {suggestion.name}
                                     </button>
                                   ))}
                                 </div>
@@ -1578,7 +1516,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
               )}
 
               {!loadingPlayers && Object.entries(playersByTeam).map(([teamName, teamPlayers]) => {
-                // Separar em duas listas: quem jogou (minutos > 0) e quem nÃ£o jogou
+                // Separar em duas listas: quem jogou (minutos > 0) e quem nÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o jogou
                 const lineup = getTeamLineup(teamPlayers)
                 const played = lineup.starters
                 const substitutes = lineup.substitutes
@@ -1589,7 +1527,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
                 const notPlayedIds = notPlayed.map(player => player.id)
                 /*
                 const notPlayedOld = lineup.notPlayed.sort((a, b) => {
-                  // Ordenar por posiÃ§Ã£o
+                  // Ordenar por posiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o
                   const posOrder = { GK: 0, ZAG: 1, LAT: 2, MEI: 3, ATK: 4 }
                   const posA = (posOrder as any)[a.position] ?? 99
                   const posB = (posOrder as any)[b.position] ?? 99
@@ -1670,7 +1608,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
                       </div>
                     )}
 
-                    {/* Jogadores que nÃ£o jogaram (ou entraram) */}
+                    {/* Jogadores que nÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o jogaram (ou entraram) */}
                     {substitutes.length > 0 && (
                       <>
                         <p className="text-xs font-semibold text-orange-300 mb-2 px-1">
@@ -1756,7 +1694,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
                                 <option value="not_played">Nao rel.</option>
                               </select>
 
-                              <span className="text-xs text-gray-700 w-12 text-center shrink-0">â€”</span>
+                              <span className="text-xs text-gray-700 w-12 text-center shrink-0">ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â</span>
 
                               <span className={`text-xs font-bold px-1.5 py-0.5 rounded w-10 text-center shrink-0 ${ratingColor(ratingNum)}`}>
                                 {ratingNum !== null && Number.isFinite(ratingNum) ? ratingNum.toFixed(1) : '-'}

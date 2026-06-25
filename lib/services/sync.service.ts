@@ -84,7 +84,7 @@ export async function resolveTeamIds(): Promise<
     'Germany', 'England', 'Austria', 'Belgium', 'Bosnia & Herzegovina', 'Croatia',
     'Scotland', 'Spain', 'France', 'Norway', 'Netherlands', 'Portugal', 'Sweden',
     'Switzerland', 'Czechia', 'Turkey', 'Argentina', 'Brazil', 'Colombia', 'Ecuador',
-    'Paraguay', 'Uruguay', 'Canada', 'USA', 'Mexico', 'Curaçao', 'Haiti', 'Panama',
+    'Paraguay', 'Uruguay', 'Canada', 'USA', 'Mexico', 'Curacao', 'Haiti', 'Panama',
     'South Africa', 'Algeria', 'Cape Verde', 'Ivory Coast', 'Egypt', 'Ghana',
     'Morocco', 'DR Congo', 'Senegal', 'Tunisia', 'Saudi Arabia', 'Australia', 'Iraq',
     'Japan', 'Jordan', 'Uzbekistan', 'Qatar', 'South Korea', 'Iran', 'New Zealand',
@@ -94,8 +94,13 @@ export async function resolveTeamIds(): Promise<
     'South Korea': 'Korea Republic',
     'DR Congo': 'Congo DR',
     'Czechia': 'Czech Republic',
-    'Turkey': 'Türkiye',
+    'Turkey': 'Turkiye',
     'Ivory Coast': "Cote D'Ivoire",
+    'Cape Verde': 'Cape Verde Islands',
+    'Bosnia & Herzegovina': 'Bosnia',
+    'Curacao': 'Curacao',
+    'New Zealand': 'New Zealand',
+    'USA': 'United States',
   }
 
   // Buscar teams da Copa 2022 para cache
