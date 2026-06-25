@@ -1,6 +1,5 @@
 'use client'
 
-import Image from 'next/image'
 import { useState } from 'react'
 
 type PlayerPhotoProps = {
@@ -34,13 +33,15 @@ export function PlayerPhoto({ src, alt, size, className = '', fallbackClassName 
   }
 
   return (
-    <Image
+    <img
       src={src}
       alt={alt}
       width={size}
       height={size}
       className={className}
-      unoptimized
+      loading="lazy"
+      decoding="async"
+      referrerPolicy="no-referrer"
       onError={() => setFailed(true)}
     />
   )
