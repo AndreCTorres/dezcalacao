@@ -4,6 +4,70 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-server'
 
+function normalizeTeam(value: string | null | undefined) {
+  return String(value ?? '')
+    .replace(/Ã¼/g, 'ü')
+    .replace(/Ãœ/g, 'Ü')
+    .replace(/Ä±/g, 'ı')
+    .replace(/Ä°/g, 'İ')
+    .replace(/ÄŸ/g, 'ğ')
+    .replace(/ÅŸ/g, 'ş')
+    .replace(/Ã§/g, 'ç')
+    .replace(/Ã¶/g, 'ö')
+    .replace(/ı/g, 'i')
+    .replace(/İ/g, 'I')
+    .replace(/ğ/g, 'g')
+    .replace(/Ğ/g, 'G')
+    .replace(/ş/g, 's')
+    .replace(/Ş/g, 'S')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+const TEAM_ALIASES: Record<string, string[]> = {
+  turkey: ['turkiye', 'turquia'],
+  turkiye: ['turkey', 'turquia'],
+  turquia: ['turkey', 'turkiye'],
+  usa: ['united states', 'eua', 'estados unidos'],
+  'united states': ['usa', 'eua', 'estados unidos'],
+  bosnia: ['bosnia herzegovina', 'bosnia and herzegovina', 'bosnia & herzegovina'],
+  'bosnia herzegovina': ['bosnia', 'bosnia and herzegovina', 'bosnia & herzegovina'],
+  'bosnia and herzegovina': ['bosnia', 'bosnia herzegovina', 'bosnia & herzegovina'],
+  'ivory coast': ['cote d ivoire', 'cote divoire', 'costa do marfim'],
+  'cote d ivoire': ['ivory coast', 'cote divoire', 'costa do marfim'],
+  'cape verde': ['cape verde islands', 'cabo verde'],
+  'cape verde islands': ['cape verde', 'cabo verde'],
+  'congo dr': ['dr congo', 'democratic republic of the congo'],
+  'dr congo': ['congo dr', 'democratic republic of the congo'],
+  czechia: ['czech republic', 'rep tcheca'],
+  'czech republic': ['czechia', 'rep tcheca'],
+  'south korea': ['korea republic', 'coreia do sul'],
+  'korea republic': ['south korea', 'coreia do sul'],
+  curacao: ['curacao'],
+}
+
+function teamVariants(value: string | null | undefined) {
+  const base = normalizeTeam(value)
+  if (!base) return []
+  return Array.from(new Set([base, ...(TEAM_ALIASES[base] ?? [])].map(normalizeTeam)))
+}
+
+function teamsMatch(playerTeam: string | null | undefined, fixtureTeam: string | null | undefined) {
+  const playerVariants = teamVariants(playerTeam)
+  const fixtureVariants = teamVariants(fixtureTeam)
+  return playerVariants.some((playerVariant) =>
+    fixtureVariants.some((fixtureVariant) =>
+      playerVariant === fixtureVariant ||
+      playerVariant.includes(fixtureVariant) ||
+      fixtureVariant.includes(playerVariant)
+    )
+  )
+}
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ groupId: string }> }
@@ -32,13 +96,17 @@ export async function GET(
     return NextResponse.json({ error: 'Fixture nao encontrado' }, { status: 404 })
   }
 
-  const { data: players } = await admin
+  const { data: allPlayers } = await admin
     .from('players')
     .select('id, name, team_name, position')
-    .in('team_name', [fixture.home_team, fixture.away_team])
     .order('team_name', { ascending: true })
     .order('position', { ascending: true })
     .order('name', { ascending: true })
+
+  const players = (allPlayers ?? []).filter((player: any) =>
+    teamsMatch(player.team_name, fixture.home_team) ||
+    teamsMatch(player.team_name, fixture.away_team)
+  )
 
   if (!players || players.length === 0) {
     return NextResponse.json({ players: [] })
