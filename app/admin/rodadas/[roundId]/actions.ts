@@ -267,6 +267,20 @@ export async function upsertManualRatingsByName(
 
   const normalize = (value: string) =>
     value
+      .replace(/Ã¼/g, 'ü')
+      .replace(/Ãœ/g, 'Ü')
+      .replace(/Ä±/g, 'ı')
+      .replace(/Ä°/g, 'İ')
+      .replace(/ÄŸ/g, 'ğ')
+      .replace(/ÅŸ/g, 'ş')
+      .replace(/Ã§/g, 'ç')
+      .replace(/Ã¶/g, 'ö')
+      .replace(/ı/g, 'i')
+      .replace(/İ/g, 'I')
+      .replace(/ğ/g, 'g')
+      .replace(/Ğ/g, 'G')
+      .replace(/ş/g, 's')
+      .replace(/Ş/g, 'S')
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .toLowerCase()
@@ -543,6 +557,19 @@ export async function upsertManualRatingsByName(
       const player = Array.isArray(alias?.players) ? alias.players[0] : alias?.players
       if (player) return player
     }
+
+    const staticAliases: Record<string, Array<{ team: string; names: string[] }>> = {
+      bono: [{ team: 'morocco', names: ['bounou', 'y bounou', 'yassine bounou'] }],
+      bounou: [{ team: 'morocco', names: ['bono'] }],
+    }
+    for (const alias of staticAliases[normalize(name)] ?? []) {
+      if (team && !teamsMatch(alias.team, team)) continue
+      const player = (players as any[]).find((candidate) =>
+        teamsMatch(candidate.team_name, alias.team) &&
+        alias.names.some((aliasName) => namesCompatible(aliasName, candidate.name))
+      )
+      if (player) return player
+    }
     return null
   }
 
@@ -615,6 +642,34 @@ export async function upsertManualRatingsByName(
     return dp[s.length][t.length]
   }
 
+  const nameVariants = (value: string) => {
+    const base = normalize(value)
+    const parts = base.split(' ').filter(Boolean)
+    const noSpaces = parts.join('')
+    const variants = new Set([base, noSpaces])
+
+    if (parts.length >= 2) {
+      variants.add([...parts].reverse().join(' '))
+      variants.add([...parts].reverse().join(''))
+      variants.add(`${parts[0][0]} ${parts.slice(1).join(' ')}`)
+      variants.add(`${parts.slice(0, -1).map((part) => part[0]).join(' ')} ${parts[parts.length - 1]}`)
+    }
+
+    return Array.from(variants).filter(Boolean)
+  }
+
+  const namesCompatible = (source: string, candidate: string) => {
+    const sourceVariants = nameVariants(source)
+    const candidateVariants = nameVariants(candidate)
+    return sourceVariants.some((sourceVariant) =>
+      candidateVariants.some((candidateVariant) =>
+        sourceVariant === candidateVariant ||
+        sourceVariant.includes(candidateVariant) ||
+        candidateVariant.includes(sourceVariant)
+      )
+    )
+  }
+
   for (const entry of entries) {
     const entryName = normalize(entry.name)
     const entryTeam = normalize(entry.team ?? '')
@@ -654,7 +709,9 @@ export async function upsertManualRatingsByName(
           const sharedStrongToken = hasStrongTokenMatch(entry.name, player.name)
           const sameLastToken = lastToken(entry.name) && lastToken(entry.name) === lastToken(player.name)
           const sameInitials = initials(player.name) === initials(entry.name)
+          const variantMatch = namesCompatible(entry.name, player.name)
           const nameMatches =
+            variantMatch ||
             playerName.includes(entryName) ||
             entryName.includes(playerName) ||
             sameLastToken ||
@@ -666,6 +723,7 @@ export async function upsertManualRatingsByName(
             (nameMatches ? 2 : 0) +
             (teamMatches ? 1 : 0) +
             overlap * 4 +
+            (variantMatch ? 3 : 0) +
             (sharedStrongToken ? 2 : 0) +
             (sameLastToken ? 1.5 : 0) +
             (sameInitials ? 0.25 : 0) +
@@ -722,6 +780,7 @@ export async function upsertManualRatingsByName(
 
     const chosen =
       candidates.find((p) => entryTeam && teamsMatch(p.team_name, entryTeam)) ??
+      candidates.find((p) => namesCompatible(entry.name, p.name)) ??
       candidates.find((p) => hasStrongTokenMatch(entry.name, p.name)) ??
       candidates.find((p) => lastToken(entry.name) && lastToken(entry.name) === lastToken(p.name)) ??
       candidates.find((p) => tokenScore(entry.name, p.name) >= 0.4) ??

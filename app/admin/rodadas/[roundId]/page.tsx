@@ -49,6 +49,20 @@ export default async function RoundRatingsPage({ params }: PageProps) {
 
   const normalizeFixtureTeam = (value: string | null) =>
     (value ?? '')
+      .replace(/Ã¼/g, 'ü')
+      .replace(/Ãœ/g, 'Ü')
+      .replace(/Ä±/g, 'ı')
+      .replace(/Ä°/g, 'İ')
+      .replace(/ÄŸ/g, 'ğ')
+      .replace(/ÅŸ/g, 'ş')
+      .replace(/Ã§/g, 'ç')
+      .replace(/Ã¶/g, 'ö')
+      .replace(/ı/g, 'i')
+      .replace(/İ/g, 'I')
+      .replace(/ğ/g, 'g')
+      .replace(/Ğ/g, 'G')
+      .replace(/ş/g, 's')
+      .replace(/Ş/g, 'S')
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .toLowerCase()
@@ -139,7 +153,7 @@ export default async function RoundRatingsPage({ params }: PageProps) {
     'Ghana', 'Haiti', 'Iraq', 'Ivory Coast', 'Japan', 'Jordan', 'Mexico', 'Morocco',
     'Netherlands', 'New Zealand', 'Norway', 'Panama', 'Paraguay', 'Portugal',
     'Qatar', 'Saudi Arabia', 'Scotland', 'Senegal', 'South Africa', 'South Korea',
-    'Spain', 'Sweden', 'Switzerland', 'Tunisia', 'TÃ¼rkiye', 'Uruguay', 'USA', 'Uzbekistan',
+    'Spain', 'Sweden', 'Switzerland', 'Tunisia', 'Türkiye', 'Uruguay', 'USA', 'Uzbekistan',
   ]
 
   const teamOptions = Array.from(

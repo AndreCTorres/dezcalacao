@@ -67,12 +67,39 @@ function hasPartialFixtureScore(fixture: Fixture) {
 
 function normalizeText(value: string) {
   return value
+    .replace(/Ã¼/g, 'ü')
+    .replace(/Ãœ/g, 'Ü')
+    .replace(/Ä±/g, 'ı')
+    .replace(/Ä°/g, 'İ')
+    .replace(/ÄŸ/g, 'ğ')
+    .replace(/ÅŸ/g, 'ş')
+    .replace(/Ã§/g, 'ç')
+    .replace(/Ã¶/g, 'ö')
+    .replace(/ı/g, 'i')
+    .replace(/İ/g, 'I')
+    .replace(/ğ/g, 'g')
+    .replace(/Ğ/g, 'G')
+    .replace(/ş/g, 's')
+    .replace(/Ş/g, 'S')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .replace(/[^a-z0-9 ]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
+}
+
+function fixDisplayText(value: string | null | undefined) {
+  return String(value ?? '')
+    .replace(/TÃ¼rkiye/g, 'Türkiye')
+    .replace(/Ã¼/g, 'ü')
+    .replace(/Ãœ/g, 'Ü')
+    .replace(/Ä±/g, 'ı')
+    .replace(/Ä°/g, 'İ')
+    .replace(/ÄŸ/g, 'ğ')
+    .replace(/ÅŸ/g, 'ş')
+    .replace(/Ã§/g, 'ç')
+    .replace(/Ã¶/g, 'ö')
 }
 
 function parseRatingLine(line: string) {
@@ -274,8 +301,8 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
       away_goals: fixture.away_goals !== null && fixture.away_goals !== undefined ? String(fixture.away_goals) : '',
     })
     setFixtureTeams({
-      home_team: fixture.home_team,
-      away_team: fixture.away_team,
+      home_team: fixDisplayText(fixture.home_team),
+      away_team: fixDisplayText(fixture.away_team),
     })
     setLoadingPlayers(true)
     setPlayers([])
@@ -715,6 +742,20 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
     // Aplicar aliases aos teamHints detectados do JSON
     const correctedTeamHints = teamHints.map(hint => {
       const normalized = hint
+        .replace(/Ã¼/g, 'ü')
+        .replace(/Ãœ/g, 'Ü')
+        .replace(/Ä±/g, 'ı')
+        .replace(/Ä°/g, 'İ')
+        .replace(/ÄŸ/g, 'ğ')
+        .replace(/ÅŸ/g, 'ş')
+        .replace(/Ã§/g, 'ç')
+        .replace(/Ã¶/g, 'ö')
+        .replace(/ı/g, 'i')
+        .replace(/İ/g, 'I')
+        .replace(/ğ/g, 'g')
+        .replace(/Ğ/g, 'G')
+        .replace(/ş/g, 's')
+        .replace(/Ş/g, 'S')
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
         .toLowerCase()
@@ -1097,7 +1138,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
             >
               <div className="mb-3 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
                 <p className="truncate text-right text-sm font-bold text-white group-hover:text-lime-300 transition">
-                  {fixture.home_team}
+                  {fixDisplayText(fixture.home_team)}
                 </p>
                 <div className={`rounded-xl border px-3 py-2 min-w-24 text-center ${
                   hasScore
@@ -1122,14 +1163,14 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
                   </span>
                 </div>
                 <p className="truncate text-left text-sm font-bold text-white group-hover:text-lime-300 transition">
-                  {fixture.away_team}
+                  {fixDisplayText(fixture.away_team)}
                 </p>
               </div>
               <div className="flex items-center justify-between gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-3 flex-wrap">
                     <p className="font-semibold text-white text-base group-hover:text-lime-300 transition">
-                      {fixture.label || `${fixture.home_team} x ${fixture.away_team}`}
+                      {fixDisplayText(fixture.label || `${fixture.home_team} x ${fixture.away_team}`)}
                     </p>
                     {hasScore && (
                       <span className="text-sm font-bold text-lime-300 px-2 py-0.5 bg-lime-500/10 rounded">
@@ -1138,7 +1179,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
                     )}
                   </div>
                   <div className="text-xs text-gray-500 mt-1 flex items-center gap-2">
-                    <span>{fixture.home_team} x {fixture.away_team}</span>
+                    <span>{fixDisplayText(fixture.home_team)} x {fixDisplayText(fixture.away_team)}</span>
                     {kickoffDate && (
                       <span className="text-gray-600">
                         â€¢ {kickoffDate.toLocaleDateString('pt-BR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
@@ -1187,7 +1228,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
           <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-700 shrink-0">
               <div>
-                <h2 className="font-bold text-white text-lg">{selectedFixture.label}</h2>
+                <h2 className="font-bold text-white text-lg">{fixDisplayText(selectedFixture.label)}</h2>
                 <p className="text-xs text-gray-400 mt-0.5">Preencha as notas e salve o jogo inteiro.</p>
               </div>
               <button
@@ -1314,7 +1355,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
                     <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Placar do Jogo</h4>
                     <div className="flex items-center gap-3">
                       <div className="flex-1">
-                        <p className="text-xs text-gray-500 mb-1">{fixtureTeams.home_team || selectedFixture.home_team}</p>
+                        <p className="text-xs text-gray-500 mb-1">{fixDisplayText(fixtureTeams.home_team || selectedFixture.home_team)}</p>
                         <input
                           type="number"
                           min={0}
@@ -1329,7 +1370,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
                         <span className="text-xs">x</span>
                       </div>
                       <div className="flex-1">
-                        <p className="text-xs text-gray-500 mb-1">{fixtureTeams.away_team || selectedFixture.away_team}</p>
+                        <p className="text-xs text-gray-500 mb-1">{fixDisplayText(fixtureTeams.away_team || selectedFixture.away_team)}</p>
                         <input
                           type="number"
                           min={0}

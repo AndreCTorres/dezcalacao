@@ -1,9 +1,9 @@
 'use client'
 
 // app/admin/rodadas/[roundId]/ratings-audit-viewer.tsx
-// Visualizador de histórico/auditoria de mudanças de ratings
+// Visualizador de histÃ³rico/auditoria de mudanÃ§as de ratings
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 
 type AuditChange = {
   audit_id: string
@@ -68,34 +68,58 @@ export function RatingsAuditViewer({ groupId, roundId, roundName }: Props) {
     recentChanges: AuditChange[]
     anomalies: Anomaly[]
   } | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
+  const [expanded, setExpanded] = useState(false)
   const [selectedPlayer, setSelectedPlayer] = useState<number | null>(null)
   const [expandedAnomalies, setExpandedAnomalies] = useState(false)
 
-  useEffect(() => {
-    const fetchAudit = async () => {
-      setLoading(true)
-      try {
-        const res = await fetch(`/api/admin/rounds/${roundId}/audit`)
-        if (res.ok) {
-          const auditData = await res.json()
-          setData(auditData)
-        } else {
-          console.error('Erro ao buscar auditoria')
-        }
-      } catch (error) {
-        console.error('[AuditViewer] Erro:', error)
+  async function loadAudit() {
+    if (data || loading) return
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/admin/rounds/${roundId}/audit`)
+      if (res.ok) {
+        const auditData = await res.json()
+        setData(auditData)
+      } else {
+        console.error('Erro ao buscar auditoria')
       }
-      setLoading(false)
+    } catch (error) {
+      console.error('[AuditViewer] Erro:', error)
     }
+    setLoading(false)
+  }
 
-    fetchAudit()
-  }, [roundId])
+  async function toggleExpanded() {
+    const nextExpanded = !expanded
+    setExpanded(nextExpanded)
+    if (nextExpanded) await loadAudit()
+  }
+
+  if (!expanded) {
+    return (
+      <div className="bg-gray-800/60 rounded-lg p-3 border border-gray-700">
+        <button
+          type="button"
+          onClick={toggleExpanded}
+          className="w-full flex items-center justify-between gap-3 text-left"
+        >
+          <div>
+            <p className="text-sm font-semibold text-white">Historico de mudancas</p>
+            <p className="text-xs text-gray-500">Auditoria tecnica; carregue apenas se precisar investigar uma alteracao.</p>
+          </div>
+          <span className="rounded border border-gray-600 bg-gray-900 px-3 py-1 text-xs font-semibold text-gray-200">
+            Ver historico
+          </span>
+        </button>
+      </div>
+    )
+  }
 
   if (loading) {
     return (
       <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-        <p className="text-gray-400 text-sm">⏳ Carregando histórico...</p>
+        <p className="text-gray-400 text-sm">Carregando historico...</p>
       </div>
     )
   }
@@ -107,19 +131,25 @@ export function RatingsAuditViewer({ groupId, roundId, roundName }: Props) {
       </div>
     )
   }
-
   const filteredChanges = selectedPlayer
     ? data.recentChanges.filter((c) => c.player_id === selectedPlayer)
     : data.recentChanges
 
   return (
     <div className="space-y-4">
+      <button
+        type="button"
+        onClick={() => setExpanded(false)}
+        className="text-xs font-semibold text-gray-400 hover:text-white"
+      >
+        Ocultar historico
+      </button>
       {/* Header com stats */}
       <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
-        <h3 className="text-lg font-bold text-white mb-3">📋 Histórico de Mudanças</h3>
+        <h3 className="text-lg font-bold text-white mb-3">ðŸ“‹ HistÃ³rico de MudanÃ§as</h3>
         <div className="grid grid-cols-3 gap-3">
           <div className="bg-gray-900/50 rounded-lg p-3 border border-gray-700">
-            <p className="text-xs text-gray-500 mb-1">Total de Mudanças</p>
+            <p className="text-xs text-gray-500 mb-1">Total de MudanÃ§as</p>
             <p className="text-2xl font-bold text-lime-400">{data.stats.totalChanges}</p>
           </div>
           <div className="bg-gray-900/50 rounded-lg p-3 border border-gray-700">
@@ -152,8 +182,8 @@ export function RatingsAuditViewer({ groupId, roundId, roundName }: Props) {
             onClick={() => setExpandedAnomalies(!expandedAnomalies)}
             className="w-full text-left flex items-center justify-between"
           >
-            <h4 className="font-bold text-red-300">⚠️ Anomalias Detectadas ({data.anomalies.length})</h4>
-            <span className={`transition-transform ${expandedAnomalies ? 'rotate-90' : ''}`}>▶</span>
+            <h4 className="font-bold text-red-300">âš ï¸ Anomalias Detectadas ({data.anomalies.length})</h4>
+            <span className={`transition-transform ${expandedAnomalies ? 'rotate-90' : ''}`}>â–¶</span>
           </button>
 
           {expandedAnomalies && (
@@ -216,12 +246,12 @@ export function RatingsAuditViewer({ groupId, roundId, roundName }: Props) {
         </div>
       )}
 
-      {/* Lista de mudanças */}
+      {/* Lista de mudanÃ§as */}
       <div className="space-y-2">
-        <h4 className="font-semibold text-white text-sm">Mudanças Recentes</h4>
+        <h4 className="font-semibold text-white text-sm">MudanÃ§as Recentes</h4>
         {filteredChanges.length === 0 ? (
           <div className="bg-gray-800 rounded-lg p-4 border border-gray-700 text-center text-gray-400 text-sm">
-            Nenhuma mudança neste filtro
+            Nenhuma mudanÃ§a neste filtro
           </div>
         ) : (
           filteredChanges.map((change) => (
@@ -254,13 +284,13 @@ export function RatingsAuditViewer({ groupId, roundId, roundName }: Props) {
                     {change.old_rating !== null ? (
                       <>
                         <span className="line-through text-gray-600">{change.old_rating.toFixed(2)}</span>
-                        {' → '}
+                        {' â†’ '}
                       </>
                     ) : null}
                     {change.new_rating !== null ? (
                       <span className="font-bold text-lime-400">{change.new_rating.toFixed(2)}</span>
                     ) : (
-                      <span className="text-gray-500">—</span>
+                      <span className="text-gray-500">â€”</span>
                     )}
                   </p>
                 </div>
@@ -270,13 +300,13 @@ export function RatingsAuditViewer({ groupId, roundId, roundName }: Props) {
                     {change.old_minutes !== null ? (
                       <>
                         <span className="line-through text-gray-600">{change.old_minutes}</span>
-                        {' → '}
+                        {' â†’ '}
                       </>
                     ) : null}
                     {change.new_minutes !== null ? (
                       <span className="font-bold">{change.new_minutes}</span>
                     ) : (
-                      <span className="text-gray-500">—</span>
+                      <span className="text-gray-500">â€”</span>
                     )}
                   </p>
                 </div>
@@ -284,12 +314,12 @@ export function RatingsAuditViewer({ groupId, roundId, roundName }: Props) {
 
               {change.anomaly_flag && (
                 <div className="mt-2 p-2 bg-black/30 rounded border border-yellow-500/30">
-                  <p className="text-xs font-semibold text-yellow-300">🚨 {change.anomaly_flag}</p>
+                  <p className="text-xs font-semibold text-yellow-300">ðŸš¨ {change.anomaly_flag}</p>
                 </div>
               )}
 
               {change.change_reason && (
-                <p className="text-xs text-gray-400 mt-2">Razão: {change.change_reason}</p>
+                <p className="text-xs text-gray-400 mt-2">RazÃ£o: {change.change_reason}</p>
               )}
             </div>
           ))
