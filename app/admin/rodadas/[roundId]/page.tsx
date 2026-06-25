@@ -149,11 +149,11 @@ export default async function RoundRatingsPage({ params }: PageProps) {
   const WORLD_CUP_TEAM_OPTIONS = [
     'Algeria', 'Argentina', 'Australia', 'Austria', 'Belgium', 'Bosnia & Herzegovina',
     'Brazil', 'Canada', 'Cape Verde Islands', 'Colombia', 'Congo DR', 'Croatia',
-    'CuraÃ§ao', 'Czech Republic', 'Ecuador', 'Egypt', 'England', 'France', 'Germany',
+    'Curacao', 'Czech Republic', 'Ecuador', 'Egypt', 'England', 'France', 'Germany',
     'Ghana', 'Haiti', 'Iraq', 'Ivory Coast', 'Japan', 'Jordan', 'Mexico', 'Morocco',
     'Netherlands', 'New Zealand', 'Norway', 'Panama', 'Paraguay', 'Portugal',
     'Qatar', 'Saudi Arabia', 'Scotland', 'Senegal', 'South Africa', 'South Korea',
-    'Spain', 'Sweden', 'Switzerland', 'Tunisia', 'Türkiye', 'Uruguay', 'USA', 'Uzbekistan',
+    'Spain', 'Sweden', 'Switzerland', 'Tunisia', 'Turkey', 'Uruguay', 'USA', 'Uzbekistan',
   ]
 
   const teamOptions = Array.from(

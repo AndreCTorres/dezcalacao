@@ -780,9 +780,9 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
         'cape verde': 'Cape Verde Islands',
         'capeverde': 'Cape Verde Islands',
         'cabo verde': 'Cape Verde Islands',
-        turkiye: 'Türkiye',
-        turkey: 'Türkiye',
-        turquia: 'Türkiye',
+        turkiye: 'Turkey',
+        turkey: 'Turkey',
+        turquia: 'Turkey',
         'czechia': 'Czech Republic',
         'czech republic': 'Czech Republic',
         'rep tcheca': 'Czech Republic',
@@ -790,7 +790,7 @@ export function RoundRatingsManager({ groupId, roundId, fixtures, teamOptions }:
         'south korea': 'South Korea',
         'korea republic': 'South Korea',
         'coreia do sul': 'South Korea',
-        curacao: 'Curaçao',
+        curacao: 'Curacao',
       }
       
       const corrected = corrections[normalized]

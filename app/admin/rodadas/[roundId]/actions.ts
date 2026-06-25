@@ -561,6 +561,23 @@ export async function upsertManualRatingsByName(
     const staticAliases: Record<string, Array<{ team: string; names: string[] }>> = {
       bono: [{ team: 'morocco', names: ['bounou', 'y bounou', 'yassine bounou'] }],
       bounou: [{ team: 'morocco', names: ['bono'] }],
+      'u cakir': [{ team: 'turkey', names: ['cakir', 'ugurcan cakir', 'u cakir'] }],
+      'f kadioglu': [{ team: 'turkey', names: ['kadioglu', 'ferdi kadioglu', 'f kadioglu'] }],
+      'k yildiz': [{ team: 'turkey', names: ['yildiz', 'kenan yildiz', 'k yildiz'] }],
+      'i yuksek': [{ team: 'turkey', names: ['yuksek', 'ismail yuksek', 'i yuksek'] }],
+      'a bardakci': [{ team: 'turkey', names: ['bardakci', 'abdulkerim bardakci', 'a bardakci'] }],
+      'm demiral': [{ team: 'turkey', names: ['demiral', 'merih demiral', 'm demiral'] }],
+      'a guler': [{ team: 'turkey', names: ['guler', 'arda guler', 'a guler'] }],
+      'k akturkoglu': [{ team: 'turkey', names: ['akturkoglu', 'kerem akturkoglu', 'k akturkoglu'] }],
+      'h calhanoglu': [{ team: 'turkey', names: ['calhanoglu', 'hakan calhanoglu', 'h calhanoglu'] }],
+      'y akgun': [{ team: 'turkey', names: ['akgun', 'yunus akgun', 'y akgun'] }],
+      'm muldur': [{ team: 'turkey', names: ['muldur', 'mert muldur', 'm muldur'] }],
+      'b alper yilmaz': [{ team: 'turkey', names: ['yilmaz', 'baris alper yilmaz', 'b a yilmaz', 'b alper yilmaz'] }],
+      'b a yilmaz': [{ team: 'turkey', names: ['yilmaz', 'baris alper yilmaz', 'b alper yilmaz'] }],
+      'c uzun': [{ team: 'turkey', names: ['uzun', 'can uzun', 'c uzun'] }],
+      'd gul': [{ team: 'turkey', names: ['gul', 'deniz gul', 'd gul'] }],
+      'e elmali': [{ team: 'turkey', names: ['elmali', 'eren elmali', 'e elmali'] }],
+      'o kokcu': [{ team: 'turkey', names: ['kokcu', 'orkan kokcu', 'o kokcu'] }],
     }
     for (const alias of staticAliases[normalize(name)] ?? []) {
       if (team && !teamsMatch(alias.team, team)) continue
@@ -757,7 +774,8 @@ export async function upsertManualRatingsByName(
             a.position.localeCompare(b.position) ||
             a.name.localeCompare(b.name)
           )
-        const suggestions = scopedPlayers
+        const suggestionPool = scopedPlayers.length > 0 ? scopedPlayers : (players as any[])
+        const suggestions = suggestionPool
           .map((player) => ({
             id: player.id as number,
             name: player.name as string,
